@@ -70,7 +70,7 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
   const initialData = queryResult?.data?.data;
 
   // --- 3. Schema Transformation ---
-  // Injects relational options into the schema and cleans up navigation properties.
+  // Dynamically cleans the schema and injects relational options.
   const cleanedSchema = useMemo(() => {
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
@@ -78,12 +78,21 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
       const idKey = Object.keys(s.properties).find(k => k.toLowerCase() === "id");
       if (action === "create" && idKey) delete s.properties[idKey];
       
-      // Remove EF navigation properties that shouldn't be in the form
-      ["category", "products", "Category", "Products"].forEach(p => delete s.properties[p]);
-
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
+
+        // Dynamically remove EF navigation properties or complex objects
+        // We only want to keep primitive types or fields explicitly defined in relations
+        const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
+        const isComplexType = prop.type === "object" || prop.type === "array" || 
+                             (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
+
+        if (isComplexType && !isRelation) {
+          delete s.properties[key];
+          return;
+        }
+
         if (!prop.title) prop.title = key.charAt(0).toUpperCase() + key.slice(1);
         
         // Convert to dropdown if relation exists
@@ -96,7 +105,7 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
       });
     }
     return s;
-  }, [schema, relOptions, action]);
+  }, [schema, relOptions, action, relations]);
 
   // --- 4. Data Mapping (formData) ---
   // Maps raw server data to the form fields, ensuring correct types and defaults.
