@@ -37,7 +37,7 @@ const RefineContextWrapper = ({ children }) => {
     );
 };
 
-const HomePage = ({ forecasts, contents }) => (
+const HomePage = ({ contents }) => (
     <div style={{ padding: '20px' }}>
         <h1 id="tabelLabel">Weather forecast</h1>
         <p>This component demonstrates fetching data from the server.</p>

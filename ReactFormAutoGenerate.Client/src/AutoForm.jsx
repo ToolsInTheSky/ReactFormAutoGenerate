@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Edit, Create } from "@refinedev/mui";
 import { useForm } from "@refinedev/core";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import Form from "@rjsf/mui";
 import validator from "@rjsf/validator-ajv8";
 import axios from "axios";
@@ -31,28 +31,28 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
 
   // --- 1. Relational Data Loading ---
   // Fetches data for fields that should be rendered as dropdowns (e.g., CategoryId).
-  const relQueries = relations.map(rel => ({
-    field: rel.field.toLowerCase(),
-    query: useQuery({
+  const relQueriesResults = useQueries({
+    queries: relations.map(rel => ({
       queryKey: [rel.resource],
       queryFn: () => api.get(`/${rel.resource}`).then(res => res.data),
       select: (data) => (Array.isArray(data) ? data : (data.data || [])).map(item => ({
         const: item.id || item.Id || item.ID,
         title: String(item[rel.labelField] || item.Name || item.name || item.id)
       }))
-    })
-  }));
+    }))
+  });
 
-  const isRelLoading = relQueries.some(rq => rq.query.isLoading);
+  const isRelLoading = relQueriesResults.some(res => res.isLoading);
   
   // Aggregate relational options into a lookup object
   const relOptions = useMemo(() => {
     const options = {};
-    relQueries.forEach(rq => {
-      if (rq.query.data) options[rq.field] = rq.query.data;
+    relQueriesResults.forEach((res, index) => {
+      const field = relations[index].field.toLowerCase();
+      if (res.data) options[field] = res.data;
     });
     return options;
-  }, [relQueries.map(rq => rq.query.data)]);
+  }, [relQueriesResults, relations]);
 
   // --- 2. Refine useForm Hook ---
   // Manages the mutation (POST/PATCH) and initial data fetching from the API.

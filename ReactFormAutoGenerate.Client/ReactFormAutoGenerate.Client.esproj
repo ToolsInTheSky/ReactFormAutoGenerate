@@ -4,6 +4,7 @@
     <JavaScriptTestRoot>src\</JavaScriptTestRoot>
     <JavaScriptTestFramework>Vitest</JavaScriptTestFramework>
     <BuildCommand>yarn install &amp;&amp; yarn build</BuildCommand>
+    <PackageManager>yarn</PackageManager>
     <!-- Allows the build (or compile) script located on package.json to run on Build -->
     <ShouldRunBuildScript>true</ShouldRunBuildScript>
     <!-- Folder where production build objects will be placed -->

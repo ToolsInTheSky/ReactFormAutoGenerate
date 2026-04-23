@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { List as RefineList } from "@refinedev/mui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
 import axios from "axios";
 import { 
   Box, 
@@ -56,9 +56,8 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
   const records = useMemo(() => Array.isArray(recordsRaw) ? recordsRaw : (recordsRaw?.data || []), [recordsRaw]);
 
   // Fetch labels for foreign key fields (e.g., displaying Category Name instead of ID)
-  const lookupQueries = relations.map(rel => ({
-    field: rel.field.toLowerCase(),
-    query: useQuery({
+  const lookupQueriesResults = useQueries({
+    queries: relations.map(rel => ({
       queryKey: [rel.resource],
       queryFn: () => api.get(`/${rel.resource}`).then(res => res.data),
       select: (data) => {
@@ -69,14 +68,19 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
         });
         return map;
       }
-    })
-  }));
+    }))
+  });
 
   const lookups = useMemo(() => {
     const maps = {};
-    lookupQueries.forEach(lq => { if (lq.query.data) maps[lq.field] = lq.query.data; });
+    lookupQueriesResults.forEach((res, index) => {
+      if (res.data) {
+        const field = relations[index].field.toLowerCase();
+        maps[field] = res.data;
+      }
+    });
     return maps;
-  }, [lookupQueries.map(lq => lq.query.data)]);
+  }, [lookupQueriesResults, relations]);
 
   // --- 3. Dynamic Column Generation ---
   // Exclude navigation properties from the table columns
