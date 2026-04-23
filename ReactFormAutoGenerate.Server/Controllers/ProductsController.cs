@@ -45,6 +45,7 @@ public class ProductsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [HttpPatch("{id}")]
     public async Task<IActionResult> PutProduct(int id, Product product)
     {
         if (id != product.Id)

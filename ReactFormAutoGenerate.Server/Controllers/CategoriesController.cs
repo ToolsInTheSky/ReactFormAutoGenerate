@@ -45,6 +45,7 @@ public class CategoriesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [HttpPatch("{id}")]
     public async Task<IActionResult> PutCategory(int id, Category category)
     {
         if (id != category.Id)
