@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "gql-query-builder": "^3.8.0",
+    "graphql-tag": "^2.12.6",
+    "graphql-ws": "^6.0.8"
+  }
+}

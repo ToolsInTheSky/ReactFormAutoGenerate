@@ -34,8 +34,8 @@ if (!fs.existsSync(certFilePath) || !fs.existsSync(keyFilePath)) {
     }
 }
 
-const target = env.ASPNETCORE_HTTPS_PORT ? `https://localhost:${env.ASPNETCORE_HTTPS_PORT}` :
-    env.ASPNETCORE_URLS ? env.ASPNETCORE_URLS.split(';')[0] : 'https://localhost:7018';
+// Manually run server port is 5243
+const target = 'http://127.0.0.1:5243';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -47,13 +47,18 @@ export default defineConfig({
     },
     server: {
         proxy: {
-            '^/weatherforecast': {
+            '/weatherforecast': {
                 target,
                 secure: false
             },
-            '^/api': {
+            '/api': {
                 target,
                 secure: false
+            },
+            '/graphql': {
+                target,
+                secure: false,
+                changeOrigin: true
             }
         },
         port: 5173,
