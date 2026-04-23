@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Box, Tabs, Tab } from "@mui/material";
-import AutoManager from "./AutoManager";
+import AutoManager from "./components/rjsf/AutoManager";
 
 /**
  * RefineRjsfExample Component
