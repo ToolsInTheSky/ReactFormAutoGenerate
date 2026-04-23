@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { Box, Typography, Tabs, Tab, Paper } from '@mui/material';
 import { useSelect } from '@refinedev/core';
-import { UniformEntityManager } from './components/uniform/UniformEntityManager';
+import { UniformEntityManager } from './components/rest/uniform/UniformEntityManager';
 
 /**
- * RefineUniformExample Component
+ * RestUniformExample Component
  * Demonstrates the integration of Refine with UniformEntityManager for CRUD operations
- * on Categories and Products using JSON Schema-driven forms.
+ * on Categories and Products using JSON Schema-driven forms via REST API.
  */
-export const RefineUniformExample = () => {
+export const RestUniformExample = () => {
     // State to manage active tab (0 for Categories, 1 for Products)
     const [tabIndex, setTabIndex] = useState(0);
 
@@ -49,7 +49,7 @@ export const RefineUniformExample = () => {
         <Box sx={{ p: 3 }}>
             {/* Page Header */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4">Refine + Uniform Management</Typography>
+                <Typography variant="h4">REST + Refine + Uniforms</Typography>
             </Box>
 
             {/* Navigation Tabs */}
@@ -90,4 +90,4 @@ export const RefineUniformExample = () => {
     );
 };
 
-export default RefineUniformExample;
+export default RestUniformExample;

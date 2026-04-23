@@ -8,8 +8,8 @@ import dataProvider from "@refinedev/simple-rest";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import { RefineRjsfExample } from './RefineRjsfExample';
-import { RefineUniformExample } from './RefineUniformExample';
+import { RestRjsfExample } from './RestRjsfExample';
+import { RestUniformExample } from './RestUniformExample';
 
 /**
  * Material UI Theme Configuration
@@ -80,41 +80,41 @@ const HomePage = () => {
 
             <hr style={{ opacity: 0.2, margin: '40px 0' }} />
 
-            {/* Library Comparison Section */}
+            {/* Library Comparison Section (RESTful API) */}
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                 
                 <Box sx={{ maxWidth: 500 }}>
-                    <Typography variant="h5" gutterBottom>Refine + RJSF</Typography>
+                    <Typography variant="h5" gutterBottom>REST + Refine + RJSF</Typography>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
                         Uses <b>react-jsonschema-form</b> to render high-fidelity forms 
-                        directly from .NET 9 generated JSON schemas.
+                        directly from .NET 9 generated JSON schemas via REST API.
                     </Typography>
                     <Button 
                         variant="contained" 
                         component={Link} 
-                        to="/refine-rjsf-example"
+                        to="/rest-rjsf-example"
                         size="large"
                         fullWidth
                     >
-                        Go to RJSF Example
+                        Go to REST + RJSF Example
                     </Button>
                 </Box>
                 
                 <Box sx={{ maxWidth: 500 }}>
-                    <Typography variant="h5" gutterBottom>Refine + Uniforms</Typography>
+                    <Typography variant="h5" gutterBottom>REST + Refine + Uniforms</Typography>
                     <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
                         Leverages <b>Uniforms</b> with AJV validation for a highly 
-                        customizable and performant schema-to-form bridge.
+                        customizable and performant schema-to-form bridge via REST API.
                     </Typography>
                     <Button 
                         variant="contained" 
                         color="secondary"
                         component={Link} 
-                        to="/refine-uniform-example"
+                        to="/rest-uniform-example"
                         size="large"
                         fullWidth
                     >
-                        Go to Uniforms Example
+                        Go to REST + Uniforms Example
                     </Button>
                 </Box>
 
@@ -136,20 +136,20 @@ function App() {
                     <RefineContextWrapper>
                         <Routes>
                             <Route index element={<HomePage />} />
-                            <Route path="/refine-rjsf-example" element={
+                            <Route path="/rest-rjsf-example" element={
                                 <Box sx={{ p: 4 }}>
                                     <Button component={Link} to="/" variant="outlined" sx={{ mb: 4 }}>
                                         ← Back to Selection
                                     </Button>
-                                    <RefineRjsfExample />
+                                    <RestRjsfExample />
                                 </Box>
                             } />
-                            <Route path="/refine-uniform-example" element={
+                            <Route path="/rest-uniform-example" element={
                                 <Box sx={{ p: 4 }}>
                                     <Button component={Link} to="/" variant="outlined" sx={{ mb: 4 }}>
                                         ← Back to Selection
                                     </Button>
-                                    <RefineUniformExample />
+                                    <RestUniformExample />
                                 </Box>
                             } />
                         </Routes>

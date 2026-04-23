@@ -7,12 +7,12 @@ using ReactFormAutoGenerate.Server.Entities;
 namespace ReactFormAutoGenerate.Server.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class SchemaController : ControllerBase
+[Route("api/schema/uniforms")]
+public class UniformsSchemaController : ControllerBase
 {
     private readonly JsonSerializerOptions _options;
 
-    public SchemaController()
+    public UniformsSchemaController()
     {
         _options = new JsonSerializerOptions(JsonSerializerOptions.Default)
         {
@@ -20,30 +20,31 @@ public class SchemaController : ControllerBase
         };
     }
 
-    [HttpGet("all")]
-    public IActionResult GetAllSchemas()
+    [HttpGet("{name}")]
+    public IActionResult GetSchema(string name)
     {
-        var entities = new[] { typeof(Category), typeof(Product) };
-        var rjsf = new Dictionary<string, JsonNode>();
-        var uniforms = new Dictionary<string, JsonNode>();
+        var type = GetEntityType(name);
+        if (type == null) return NotFound($"Entity '{name}' not found.");
 
-        foreach (var type in entities)
-        {
-            var schemaNode = _options.GetJsonSchemaAsNode(type);
-            rjsf[type.Name] = schemaNode;
+        var schema = _options.GetJsonSchemaAsNode(type).AsObject();
+        CleanSchemaForUniforms(schema);
+        
+        return Ok(schema);
+    }
 
-            var uniNode = schemaNode.DeepClone().AsObject();
-            CleanSchemaForUniforms(uniNode);
-            uniforms[type.Name] = uniNode;
-        }
-
-        return Ok(new { RJSF = rjsf, Uniforms = uniforms });
+    private Type? GetEntityType(string name)
+    {
+        return typeof(Category).Assembly.GetTypes().FirstOrDefault(t => 
+            t.Namespace == "ReactFormAutoGenerate.Server.Entities" && 
+            string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 
     private void CleanSchemaForUniforms(JsonObject schema)
     {
         if (schema.TryGetPropertyValue("type", out var typeNode))
+        {
             schema["type"] = "object";
+        }
 
         if (schema.TryGetPropertyValue("properties", out var propertiesNode) && propertiesNode is JsonObject properties)
         {
@@ -54,8 +55,11 @@ public class SchemaController : ControllerBase
                 {
                     if (pType is JsonArray pArray)
                     {
-                        var first = pArray.FirstOrDefault(t => t?.GetValue<string>() != "null");
-                        if (first != null) propObj["type"] = first.GetValue<string>();
+                        var firstNonNullable = pArray.FirstOrDefault(t => t?.GetValue<string>() != "null");
+                        if (firstNonNullable != null)
+                        {
+                            propObj["type"] = firstNonNullable.GetValue<string>();
+                        }
                     }
                 }
             }

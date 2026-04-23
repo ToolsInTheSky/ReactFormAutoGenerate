@@ -44,7 +44,7 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
   // Fetch the JSON Schema for the current entity
   const { data: schema } = useQuery({
     queryKey: ["schema", schemaKey],
-    queryFn: () => api.get(`/schema/${schemaKey}`).then(res => res.data)
+    queryFn: () => api.get(`/schema/rjsf/${schemaKey}`).then(res => res.data)
   });
 
   // Fetch all records for the list view

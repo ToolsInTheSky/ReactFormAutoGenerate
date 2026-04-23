@@ -1,13 +1,17 @@
 import React, { useState } from "react";
-import { Box, Tabs, Tab } from "@mui/material";
-import AutoManager from "./components/rjsf/AutoManager";
+import { Box, Tabs, Tab, Typography } from "@mui/material";
+import AutoManager from "./components/rest/rjsf/AutoManager";
 
 /**
- * RefineRjsfExample Component
- * The main container for the auto-generating UI demo.
- * Uses Material UI Tabs to switch between managing different resources.
+ * RestRjsfExample Component
+ * The main container for the auto-generating UI demo using RJSF via REST API.
+ * 
+ * NOTE ON ARCHITECTURE:
+ * While Refine internally uses TanStack Query and Axios via its Data Provider,
+ * this specific component is designed as an EXPLICIT EXAMPLE of using 
+ * react-query and axios directly alongside Refine.
  */
-export const RefineRjsfExample = () => {
+export const RestRjsfExample = () => {
   const [activeTab, setActiveTab] = useState(0);
 
   /**
@@ -18,7 +22,12 @@ export const RefineRjsfExample = () => {
   };
 
   return (
-    <Box>
+    <Box sx={{ p: 3 }}>
+      {/* Page Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4">REST + Refine + RJSF</Typography>
+      </Box>
+
       {/* Navigation Tabs for switching between entities */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
         <Tabs value={activeTab} onChange={handleTabChange} aria-label="management tabs">
