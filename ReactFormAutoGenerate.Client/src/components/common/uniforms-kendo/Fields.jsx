@@ -5,35 +5,57 @@ import { DropDownList } from '@progress/kendo-react-dropdowns';
 import { Label } from '@progress/kendo-react-labels';
 import { Button } from '@progress/kendo-react-buttons';
 
+const fieldStyle = { 
+  display: 'flex', 
+  alignItems: 'center', 
+  marginBottom: '15px' 
+};
+
+const labelStyle = { 
+  width: '150px', 
+  flexShrink: 0, 
+  textAlign: 'right', 
+  marginRight: '20px', 
+  fontWeight: 'bold' 
+};
+
+const inputContainerStyle = { 
+  flexGrow: 1 
+};
+
 const TextInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
-  <div className="k-form-field" style={{ marginBottom: '15px' }}>
-    <Label editorId={id} style={{ display: 'block', marginBottom: '5px' }}>
+  <div style={fieldStyle}>
+    <Label editorId={id} style={labelStyle}>
       {label}{required && <span className="k-required">*</span>}
     </Label>
-    <Input
-      id={id}
-      value={value || ""}
-      onChange={e => onChange(e.value)}
-      disabled={disabled}
-      style={{ width: '100%' }}
-    />
-    {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+    <div style={inputContainerStyle}>
+      <Input
+        id={id}
+        value={value || ""}
+        onChange={e => onChange(e.value)}
+        disabled={disabled}
+        style={{ width: '100%' }}
+      />
+      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+    </div>
   </div>
 );
 
 const NumberInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
-  <div className="k-form-field" style={{ marginBottom: '15px' }}>
-    <Label editorId={id} style={{ display: 'block', marginBottom: '5px' }}>
+  <div style={fieldStyle}>
+    <Label editorId={id} style={labelStyle}>
       {label}{required && <span className="k-required">*</span>}
     </Label>
-    <NumericTextBox
-      id={id}
-      value={value === "" || value === undefined ? null : window.Number(value)}
-      onChange={e => onChange(e.value)}
-      disabled={disabled}
-      style={{ width: '100%' }}
-    />
-    {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+    <div style={inputContainerStyle}>
+      <NumericTextBox
+        id={id}
+        value={value === "" || value === undefined ? null : window.Number(value)}
+        onChange={e => onChange(e.value)}
+        disabled={disabled}
+        style={{ width: '100%' }}
+      />
+      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+    </div>
   </div>
 );
 
@@ -46,37 +68,42 @@ const SelectInput = ({ id, label, value, onChange, disabled, required, error, sh
   const selectedValue = data.find(opt => opt.value === value);
   
   return (
-    <div className="k-form-field" style={{ marginBottom: '15px' }}>
-      <Label editorId={id} style={{ display: 'block', marginBottom: '5px' }}>
+    <div style={fieldStyle}>
+      <Label editorId={id} style={labelStyle}>
         {label}{required && <span className="k-required">*</span>}
       </Label>
-      <DropDownList
-        id={id}
-        data={data}
-        textField="text"
-        dataItemKey="value"
-        value={selectedValue}
-        onChange={e => onChange(e.value.value)}
-        disabled={disabled}
-        style={{ width: '100%' }}
-      />
-      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+      <div style={inputContainerStyle}>
+        <DropDownList
+          id={id}
+          data={data}
+          textField="text"
+          dataItemKey="value"
+          value={selectedValue}
+          onChange={e => onChange(e.value.value)}
+          disabled={disabled}
+          style={{ width: '100%' }}
+        />
+        {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+      </div>
     </div>
   );
 };
 
 const BoolInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
-  <div className="k-form-field" style={{ marginBottom: '15px', display: 'flex', alignItems: 'center' }}>
-    <Checkbox
-      id={id}
-      checked={!!value}
-      onChange={e => onChange(e.value)}
-      disabled={disabled}
-    />
-    <Label editorId={id} style={{ marginLeft: '10px' }}>
-      {label}{required && <span className="k-required">*</span>}
-    </Label>
-    {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px', marginLeft: '10px' }}>{error.message}</div>}
+  <div style={fieldStyle}>
+    <div style={labelStyle}></div>
+    <div style={{ ...inputContainerStyle, display: 'flex', alignItems: 'center' }}>
+      <Checkbox
+        id={id}
+        checked={!!value}
+        onChange={e => onChange(e.value)}
+        disabled={disabled}
+      />
+      <Label editorId={id} style={{ marginLeft: '10px' }}>
+        {label}{required && <span className="k-required">*</span>}
+      </Label>
+      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px', marginLeft: '10px' }}>{error.message}</div>}
+    </div>
   </div>
 );
 
@@ -86,10 +113,10 @@ export const SelectField = connectField(SelectInput);
 export const BoolField = connectField(BoolInput);
 
 export const SubmitField = ({ value, ...props }) => (
-  <Button themeColor="primary" type="submit" {...props} style={{ marginTop: '10px' }}>
+  <Button themeColor="primary" type="submit" {...props}>
     {value || 'Submit'}
   </Button>
 );
 
 export const ErrorsField = ({ error, children }) => 
-  error ? <div style={{ color: 'red', margin: '10px 0', fontSize: '14px' }}>{children || error.message}</div> : null;
+  error ? <div style={{ color: 'red', marginLeft: '170px', marginBottom: '10px', fontSize: '14px' }}>{children || error.message}</div> : null;

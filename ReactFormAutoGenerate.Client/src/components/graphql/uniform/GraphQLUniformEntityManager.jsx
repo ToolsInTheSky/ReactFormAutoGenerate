@@ -171,10 +171,12 @@ export const GraphQLUniformEntityManager = ({ entityName, selectOptions = {} }) 
         <div style={{ width: '100%' }}>
             {isFormOpen && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                    <Card style={{ width: '100%', maxWidth: '600px' }}>
+                    <Card style={{ width: '100%', maxWidth: '600px', backgroundColor: '#f4f4f4' }}>
                         <CardBody>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                <CardTitle>{selectedId ? `Edit ${entityName} (ID: ${selectedId})` : `Add New ${entityName}`}</CardTitle>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
+                                    {selectedId ? `Edit ${entityName} #${selectedId}` : `Add New ${entityName}`}
+                                </h3>
                                 <Button fillMode="flat" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}><SvgIcon icon={xIcon} /></Button>
                             </div>
                             {bridge && (
@@ -200,7 +202,7 @@ export const GraphQLUniformEntityManager = ({ entityName, selectOptions = {} }) 
                                     })}
                                     <ErrorsField />
                                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                        <Button fillMode="outline" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
+                                        <Button fillMode="outline" type="button" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
                                         <SubmitField value="Save" />
                                     </div>
                                 </AutoForm>

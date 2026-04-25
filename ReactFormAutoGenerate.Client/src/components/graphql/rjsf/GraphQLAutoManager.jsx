@@ -9,12 +9,33 @@ import { plusIcon, arrowRotateCwIcon } from "@progress/kendo-svg-icons";
 import { SvgIcon } from "@progress/kendo-react-common";
 import GraphQLAutoForm from "./GraphQLAutoForm";
 
+const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
+
+/**
+ * Modern KendoReact Custom Data Cell for GraphQL RJSF
+ */
+const GraphQLLookupDataCell = (props) => {
+  const { dataItem, field, lookups, originalCol } = props;
+  const val = dataItem[field] ?? dataItem[originalCol];
+  
+  const lookupKey = originalCol.toLowerCase();
+  const lookupMap = lookups[lookupKey];
+  
+  const displayVal = lookupMap ? (lookupMap[val] || lookupMap[String(val)]) : null;
+  const finalDisplay = displayVal ?? String(val ?? "");
+
+  return (
+    <td {...props.tdProps}>
+      {finalDisplay}
+    </td>
+  );
+};
+
 const GraphQLAutoManager = ({ entityName, relations = [] }) => {
   const [editingId, setEditingId] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const client = useMemo(() => new GraphQLClient(window.location.origin + "/graphql"), []);
 
-  const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
   const toPluralCamelCase = (name) => {
       const camel = name.charAt(0).toLowerCase() + name.slice(1);
       if (camel.endsWith("s")) return camel; 
@@ -93,25 +114,22 @@ const GraphQLAutoManager = ({ entityName, relations = [] }) => {
       {editingId !== null && (
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
           <div style={{ 
-            width: '100%', 
-            maxWidth: '600px', 
-            padding: '20px', 
-            border: '1px solid #ddd', 
-            borderRadius: '8px', 
-            backgroundColor: '#fff',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+            width: '100%', maxWidth: '600px', padding: '20px', 
+            border: '1px solid #ddd', borderRadius: '8px', 
+            backgroundColor: '#f4f4f4', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
           }}>
             <GraphQLAutoForm 
               id={editingId === "new" ? undefined : editingId} 
               action={editingId === "new" ? "create" : "edit"}
-              schema={schema} entityName={entityName} record={selectedRecord} onCancel={() => setEditingId(null)} relations={relations}
+              schema={schema} entityName={entityName} record={selectedRecord} 
+              onCancel={() => setEditingId(null)} relations={relations}
             />
           </div>
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3 style={{ margin: 0 }}>{entityName} Management (GraphQL)</h3>
+        <h3 style={{ margin: 0 }}>{entityName} List (GraphQL)</h3>
         <div>
           <Button fillMode="outline" onClick={() => refetchData()} style={{ marginRight: '10px' }}>
             <SvgIcon icon={arrowRotateCwIcon} /> Refresh
@@ -123,19 +141,23 @@ const GraphQLAutoManager = ({ entityName, relations = [] }) => {
       </div>
 
       <Grid data={records} style={{ height: '400px' }} onRowClick={(e) => { setEditingId(e.dataItem.id || e.dataItem.Id); setSelectedRecord(e.dataItem); }}>
-        {columns.map(col => (
-          <GridColumn key={col} field={toCamelCase(col)} title={col.toUpperCase()} cell={(props) => {
-            const dataItem = props.dataItem;
-            const field = toCamelCase(col);
-            const val = dataItem[field] ?? dataItem[col];
-            const displayVal = lookups[col.toLowerCase()]?.[val] ?? String(val ?? "");
-            return (
-              <td style={props.style} className={props.className}>
-                {displayVal}
-              </td>
-            );
-          }} />
-        ))}
+        {columns.map(col => {
+          const field = toCamelCase(col);
+          const isCategoryId = col.toLowerCase() === "categoryid";
+          
+          const CustomCell = (cellProps) => (
+            <GraphQLLookupDataCell {...cellProps} lookups={lookups} originalCol={col} />
+          );
+
+          return (
+            <GridColumn 
+              key={col} 
+              field={field} 
+              title={isCategoryId ? "CATEGORY" : col.toUpperCase()} 
+              cells={{ data: CustomCell }} 
+            />
+          );
+        })}
       </Grid>
     </div>
   );

@@ -60,8 +60,10 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
     if (s.properties) {
+      // ID 필드는 폼 제목에 표시되므로 스키마에서 완전히 제거 (생성/수정 모두)
       const idKey = Object.keys(s.properties).find(k => k.toLowerCase() === "id");
-      if (action === "create" && idKey) delete s.properties[idKey];
+      if (idKey) delete s.properties[idKey];
+      
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
@@ -126,8 +128,10 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
-        <h4 style={{ margin: 0 }}>{action === "create" ? `Create New ${entityName}` : `Edit ${entityName} #${id}`}</h4>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
+        <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
+          {action === "create" ? `Create New ${entityName}` : `Edit ${entityName} #${id}`}
+        </h3>
         <Button fillMode="flat" onClick={onCancel}><SvgIcon icon={xIcon} /></Button>
       </div>
       <Form ref={formRef} schema={cleanedSchema} uiSchema={uiSchema} validator={validator} formData={finalData}

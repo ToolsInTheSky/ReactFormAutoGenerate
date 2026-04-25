@@ -10,45 +10,54 @@ import AutoForm from "./AutoForm";
 
 const api = axios.create({ baseURL: "/api" });
 
-/**
- * Helper to get value from object case-insensitively.
- */
 const getVal = (obj, key) => {
-  if (!obj) return "";
-  const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
-  const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
+  if (!obj || !key) return undefined;
+  const targetKey = key.toLowerCase();
+  const actualKey = Object.keys(obj).find(k => k.toLowerCase() === targetKey);
+  return actualKey ? obj[actualKey] : undefined;
+};
+
+/**
+ * Modern KendoReact Custom Data Cell
+ */
+const LookupDataCell = (props) => {
+  const { dataItem, field, lookups, originalCol } = props;
+  // field(camelCase) 또는 originalCol(PascalCase)로 값 찾기
+  const val = dataItem[field] ?? getVal(dataItem, originalCol);
   
-  if (obj[camelKey] !== undefined) return obj[camelKey];
-  if (obj[pascalKey] !== undefined) return obj[pascalKey];
-  if (obj[key] !== undefined) return obj[key];
+  const lookupKey = originalCol.toLowerCase();
+  const lookupMap = lookups[lookupKey] || lookups["categoryid"];
   
-  return "";
+  const displayVal = lookupMap ? lookupMap[String(val)] : null;
+  const finalValue = displayVal ?? String(val ?? "");
+  const resultText = (finalValue === "null" || finalValue === "undefined") ? "" : finalValue;
+
+  return (
+    <td {...props.tdProps}>
+      {resultText}
+    </td>
+  );
 };
 
 const AutoManager = ({ resource, schemaKey, relations = [] }) => {
   const [editingId, setEditingId] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // Fetch the JSON Schema
   const { data: schema } = useQuery({
     queryKey: ["schema", schemaKey],
     queryFn: () => api.get(`/schema/rjsf/${schemaKey}`).then(res => res.data)
   });
 
-  // Fetch all records
   const { data: recordsRaw, isLoading, refetch } = useQuery({
     queryKey: [resource],
     queryFn: () => api.get(`/${resource}`).then(res => res.data)
   });
 
-  const records = useMemo(() => {
-    return Array.isArray(recordsRaw) ? recordsRaw : (recordsRaw?.data || []);
-  }, [recordsRaw]);
+  const records = useMemo(() => Array.isArray(recordsRaw) ? recordsRaw : (recordsRaw?.data || []), [recordsRaw]);
 
-  // Fetch labels for foreign key fields
   const lookupQueriesResults = useQueries({
     queries: relations.map(rel => ({
-      queryKey: [rel.resource],
+      queryKey: ["lookup", rel.resource, rel.field],
       queryFn: () => api.get(`/${rel.resource}`).then(res => res.data),
     }))
   });
@@ -57,14 +66,18 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
     const maps = {};
     lookupQueriesResults.forEach((res, index) => {
       if (res.data) {
-        const field = relations[index].field.toLowerCase();
+        const rel = relations[index];
+        const fieldKey = rel.field.toLowerCase();
         const list = Array.isArray(res.data) ? res.data : (res.data.data || []);
         const map = {};
         list.forEach(item => {
           const id = item.id ?? item.Id ?? item.ID;
-          map[id] = item[relations[index].labelField] || item.Name || item.name;
+          if (id !== undefined && id !== null) {
+            const label = getVal(item, rel.labelField) || getVal(item, "name") || getVal(item, "Name") || String(id);
+            map[String(id)] = label;
+          }
         });
-        maps[field] = map;
+        maps[fieldKey] = map;
       }
     });
     return maps;
@@ -72,45 +85,36 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
 
   const columns = useMemo(() => {
     if (!schema?.properties) return [];
-    return Object.keys(schema.properties).filter(key => 
-      !["category", "products", "Category", "Products"].includes(key.toLowerCase())
-    );
-  }, [schema]);
-
-  const onRowClick = (event) => {
-    const id = getVal(event.dataItem, "id");
-    setEditingId(id);
-    setSelectedRecord(event.dataItem);
-  };
+    return Object.keys(schema.properties).filter(key => {
+      const k = key.toLowerCase();
+      const prop = schema.properties[key];
+      if (["category", "products", "id"].includes(k)) return false;
+      const isRelation = relations.some(r => r.field.toLowerCase() === k);
+      if ((prop.type === "object" || prop.type === "array") && !isRelation) return false;
+      return true;
+    });
+  }, [schema, relations]);
 
   return (
     <div style={{ padding: '10px' }}>
       {editingId !== null && (
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
           <div style={{ 
-            width: '100%', 
-            maxWidth: '600px', 
-            padding: '20px', 
-            border: '1px solid #ddd', 
-            borderRadius: '8px', 
-            backgroundColor: '#fff',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+            width: '100%', maxWidth: '600px', padding: '20px', border: '1px solid #ddd', 
+            borderRadius: '8px', backgroundColor: '#f4f4f4', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
           }}>
             <AutoForm 
               id={editingId === "new" ? undefined : editingId} 
               action={editingId === "new" ? "create" : "edit"}
-              schema={schema} 
-              resource={resource} 
-              record={selectedRecord} 
-              onCancel={() => setEditingId(null)} 
-              relations={relations}
+              schema={schema} resource={resource} record={selectedRecord} 
+              onCancel={() => setEditingId(null)} relations={relations}
             />
           </div>
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <h3 style={{ margin: 0 }}>{resource.toUpperCase()} Management</h3>
+        <h3 style={{ margin: 0 }}>{resource.toUpperCase()} List</h3>
         <div>
           <Button fillMode="outline" onClick={() => refetch()} style={{ marginRight: '10px' }}>
             <SvgIcon icon={arrowRotateCwIcon} /> Refresh
@@ -122,33 +126,24 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
       </div>
 
       {isLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
-          <Loader size="large" type="pulsing" />
-        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>
       ) : (
-        <Grid
-          data={records}
-          style={{ height: '400px' }}
-          onRowClick={onRowClick}
-        >
+        <Grid data={records} style={{ height: '400px' }} onRowClick={(e) => { setEditingId(getVal(e.dataItem, "id")); setSelectedRecord(e.dataItem); }}>
           {columns.map(col => {
-            const camelField = col.charAt(0).toLowerCase() + col.slice(1);
+            const isCategoryId = col.toLowerCase() === "categoryid";
+            const dataKey = col.charAt(0).toLowerCase() + col.slice(1);
+            
+            // Modern cells.data pattern
+            const CustomCell = (cellProps) => (
+              <LookupDataCell {...cellProps} lookups={lookups} originalCol={col} />
+            );
+
             return (
               <GridColumn 
                 key={col} 
-                field={camelField} 
-                title={col.toUpperCase()} 
-                cell={(props) => {
-                  const dataItem = props.dataItem;
-                  const rawVal = dataItem[camelField] ?? dataItem[col] ?? "";
-                  const displayVal = lookups[col.toLowerCase()]?.[rawVal] ?? String(rawVal);
-                  
-                  return (
-                    <td style={props.style} className={props.className}>
-                      {displayVal === "null" ? "" : displayVal}
-                    </td>
-                  );
-                }}
+                field={dataKey} 
+                title={isCategoryId ? "CATEGORY" : col.toUpperCase()} 
+                cells={{ data: CustomCell }}
               />
             );
           })}

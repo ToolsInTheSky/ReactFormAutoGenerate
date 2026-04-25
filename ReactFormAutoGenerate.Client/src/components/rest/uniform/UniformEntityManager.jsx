@@ -8,7 +8,7 @@ import { useCreate, useNotification, useList, useInvalidate, useUpdate } from '@
 import { Grid, GridColumn } from "@progress/kendo-react-grid";
 import { Button } from "@progress/kendo-react-buttons";
 import { Loader } from "@progress/kendo-react-indicators";
-import { Card, CardBody, CardTitle } from "@progress/kendo-react-layout";
+import { Card, CardBody } from "@progress/kendo-react-layout";
 import { plusIcon, arrowRotateCwIcon, xIcon, pencilIcon } from "@progress/kendo-svg-icons";
 import { SvgIcon } from "@progress/kendo-react-common";
 
@@ -16,6 +16,35 @@ import { TextField, NumberField, SelectField, BoolField, SubmitField, ErrorsFiel
 
 const ajv = new Ajv({ allErrors: true, useDefaults: true, strict: false });
 addFormats(ajv);
+
+const getVal = (obj, key) => {
+    if (!obj || !key) return undefined;
+    const targetKey = key.toLowerCase();
+    const actualKey = Object.keys(obj).find(k => k.toLowerCase() === targetKey);
+    return actualKey ? obj[actualKey] : undefined;
+};
+
+/**
+ * Modern KendoReact Custom Data Cell for Uniforms
+ */
+const UniformLookupDataCell = (props) => {
+    const { dataItem, field, resolvedSelectOptions, originalCol } = props;
+    const val = dataItem[field] ?? getVal(dataItem, originalCol);
+    
+    const opt = resolvedSelectOptions[originalCol] || 
+                resolvedSelectOptions[originalCol.toLowerCase()] || 
+                resolvedSelectOptions["categoryid"];
+    
+    const foundOpt = opt?.options?.find(o => String(o.value) === String(val));
+    const displayVal = foundOpt ? foundOpt.label : val;
+    const resultText = (displayVal === "null" || displayVal === "undefined") ? "" : String(displayVal ?? "");
+
+    return (
+        <td {...props.tdProps}>
+            {resultText}
+        </td>
+    );
+};
 
 class RobustCustomBridge extends Bridge {
     constructor(schema, validator, overrides = {}) {
@@ -63,31 +92,24 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
 
     const { mutate: createMutation, isLoading: isCreating } = useCreate();
     const { mutate: updateMutation, isLoading: isUpdating } = useUpdate();
-    const invalidate = useInvalidate();
     const { open } = useNotification();
-    
-    const { data: listData, isLoading: isListLoading } = useList({ resource });
-
-    const handleRefresh = () => {
-        invalidate({ resource, invalidates: ["list", "detail"] });
-        fetchBackupData();
-    };
+    const { data: listData } = useList({ resource });
 
     const fetchBackupData = useCallback(() => {
         fetch(`/api/${resource}`).then(res => res.json()).then(data => setRawApiData(Array.isArray(data) ? data : []))
-            .catch(err => console.error(`DEBUG: Manual fetch error for ${resource}:`, err));
+            .catch(err => console.error(err));
     }, [resource]);
 
     const entities = useMemo(() => (listData?.data && Array.isArray(listData.data)) ? listData.data : rawApiData, [listData, rawApiData]);
 
     const formModel = useMemo(() => {
         if (selectedId) {
-            const item = entities.find(e => (e.id || e.Id) === selectedId);
+            const item = entities.find(e => String(e.id || e.Id) === String(selectedId));
             if (!item) return {};
             const mapped = {};
             if (schema?.properties) {
                 Object.keys(schema.properties).forEach(key => {
-                    const value = item[key] !== undefined ? item[key] : item[key.charAt(0).toLowerCase() + key.slice(1)];
+                    const value = getVal(item, key);
                     if (value !== undefined) mapped[key] = value;
                 });
             }
@@ -101,23 +123,24 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
         fetch(schemaUrl).then(res => res.json()).then(data => { setSchema(data); setLoading(false); })
             .catch(err => { setFetchError(err.message); setLoading(false); });
 
-        // Resolve relational options
         Object.keys(selectOptions).forEach(key => {
             const opt = selectOptions[key];
             if (opt.resource) {
                 fetch(`/api/${opt.resource}`).then(res => res.json()).then(data => {
-                    const items = (Array.isArray(data) ? data : (data.data || [])).map(item => ({
-                        label: item.Name || item.name || item.id,
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    const items = list.map(item => ({
+                        label: getVal(item, "Name") || getVal(item, "name") || String(item.id || item.Id),
                         value: item.id || item.Id || item.ID
                     }));
                     setResolvedSelectOptions(prev => ({
                         ...prev,
-                        [key]: { ...prev[key], options: items }
+                        [key]: { ...prev[key], options: items },
+                        [key.toLowerCase()]: { ...prev[key.toLowerCase()], options: items }
                     }));
                 });
             }
         });
-    }, [schemaUrl]);
+    }, [schemaUrl, resource, selectOptions, fetchBackupData]);
 
     const bridge = useMemo(() => {
         if (!schema) return null;
@@ -136,15 +159,15 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
         if (selectedId) payload.id = selectedId;
         mutation(payload, {
             onSuccess: () => {
-                open?.({ type: "success", message: `Entity ${selectedId ? 'updated' : 'created'} successfully.` });
-                setIsFormOpen(false); setSelectedId(null); handleRefresh();
+                open?.({ type: "success", message: `Success` });
+                setIsFormOpen(false); setSelectedId(null); fetchBackupData();
             },
             onError: (err) => open?.({ type: "error", message: err.message })
         });
     };
 
     if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
-    if (fetchError) return <div style={{ color: 'red', padding: '20px' }}>Schema Error: {fetchError}</div>;
+    if (fetchError) return <div style={{ color: 'red', padding: '20px' }}>{fetchError}</div>;
 
     const fields = schema ? Object.keys(schema.properties).filter(k => k !== 'Products' && k !== 'Category' && k !== 'Id') : [];
 
@@ -152,30 +175,21 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
         <div style={{ width: '100%' }}>
             {isFormOpen && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                    <Card style={{ width: '100%', maxWidth: '600px' }}>
+                    <Card style={{ width: '100%', maxWidth: '600px', backgroundColor: '#f4f4f4' }}>
                         <CardBody>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                                <CardTitle>{selectedId ? `Edit ${title} (ID: ${selectedId})` : `Add New ${title}`}</CardTitle>
-                                <Button fillMode="flat" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>
-                                    <SvgIcon icon={xIcon} />
-                                </Button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
+                                    {selectedId ? `Edit ${title} #${selectedId}` : `Add New ${title}`}
+                                </h3>
+                                <Button fillMode="flat" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}><SvgIcon icon={xIcon} /></Button>
                             </div>
                             {bridge && (
-                                <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit} disabled={isCreating || isUpdating}>
+                                <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit}>
                                     {fields.map(name => {
                                         const isIdField = name.toLowerCase() === 'id';
-                                        
-                                        // 생성 모드에서 ID 필드는 렌더링하지 않음
                                         if (isIdField && !selectedId) return null;
-
                                         const prop = bridge.getProps(name);
-                                        const fieldProps = {
-                                            key: name,
-                                            name: name,
-                                            // 수정 모드에서 ID 필드는 비활성화
-                                            disabled: isIdField && !!selectedId
-                                        };
-
+                                        const fieldProps = { key: name, name: name, disabled: isIdField && !!selectedId };
                                         if (prop.options) return <SelectField {...fieldProps} options={prop.options} />;
                                         if (prop.type === 'integer' || prop.type === 'number') return <NumberField {...fieldProps} />;
                                         if (prop.type === 'boolean') return <BoolField {...fieldProps} />;
@@ -183,7 +197,7 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
                                     })}
                                     <ErrorsField />
                                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                                        <Button fillMode="outline" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
+                                        <Button fillMode="outline" type="button" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
                                         <SubmitField value="Save" />
                                     </div>
                                 </AutoForm>
@@ -194,9 +208,9 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
             )}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                <h3 style={{ margin: 0 }}>{title} List ({entities.length} items)</h3>
+                <h3 style={{ margin: 0 }}>{title} List</h3>
                 <div>
-                    <Button fillMode="outline" onClick={handleRefresh} style={{ marginRight: '10px' }}>
+                    <Button fillMode="outline" onClick={fetchBackupData} style={{ marginRight: '10px' }}>
                         <SvgIcon icon={arrowRotateCwIcon} /> Refresh
                     </Button>
                     <Button themeColor="primary" onClick={() => { setSelectedId(null); setIsFormOpen(true); }}>
@@ -206,24 +220,25 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
             </div>
 
             <Grid data={entities} style={{ height: '400px' }} onRowClick={(e) => { setSelectedId(e.dataItem.id || e.dataItem.Id); setIsFormOpen(true); }}>
-                <GridColumn field="id" title="ID" width="80px" cell={(props) => <td style={props.style} className={props.className}>{props.dataItem.id || props.dataItem.Id}</td>} />
+                <GridColumn field="id" title="ID" width="80px" cell={(props) => <td {...props.tdProps}>{props.dataItem.id || props.dataItem.Id}</td>} />
                 {fields.map(col => {
-                    const camelField = col.charAt(0).toLowerCase() + col.slice(1);
+                    const isCategoryId = col.toLowerCase() === "categoryid";
+                    const dataKey = col.charAt(0).toLowerCase() + col.slice(1);
+
+                    const CustomCell = (cellProps) => (
+                        <UniformLookupDataCell 
+                            {...cellProps} 
+                            resolvedSelectOptions={resolvedSelectOptions} 
+                            originalCol={col} 
+                        />
+                    );
+
                     return (
                         <GridColumn 
                             key={col} 
-                            field={camelField} 
-                            title={col.toUpperCase()} 
-                            cell={(props) => {
-                                const val = props.dataItem[camelField] ?? props.dataItem[col] ?? "";
-                                const opt = resolvedSelectOptions[col];
-                                const displayVal = opt?.options?.find(o => String(o.value) === String(val))?.label || val;
-                                return (
-                                    <td style={props.style} className={props.className}>
-                                        {displayVal === "null" ? "" : String(displayVal)}
-                                    </td>
-                                );
-                            }} 
+                            field={dataKey} 
+                            title={isCategoryId ? "CATEGORY" : col.toUpperCase()} 
+                            cells={{ data: CustomCell }}
                         />
                     );
                 })}
