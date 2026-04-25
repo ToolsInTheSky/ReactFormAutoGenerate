@@ -1,48 +1,44 @@
 import React, { useState } from 'react';
-import { Box, Typography, Tabs, Tab, Paper } from '@mui/material';
+import { TabStrip, TabStripTab } from "@progress/kendo-react-layout";
 import { GraphQLUniformEntityManager } from './components/graphql/uniform/GraphQLUniformEntityManager';
 
-/**
- * GraphQLUniformExample Component
- * Demonstrates the integration of GraphQL with Uniforms for CRUD operations.
- */
 export const GraphQLUniformExample = () => {
-    const [tabIndex, setTabIndex] = useState(0);
+    const [selected, setSelected] = useState(0);
 
-    const handleTabChange = (event, newValue) => {
-        setTabIndex(newValue);
+    const handleSelect = (e) => {
+        setSelected(e.selected);
     };
 
     return (
-        <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4">GraphQL + Refine + Uniforms</Typography>
-            </Box>
+        <div style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0 }}>GraphQL + Refine + Uniforms (KendoReact)</h2>
+            </div>
 
-            <Paper sx={{ width: '100%', mb: 3 }}>
-                <Tabs value={tabIndex} onChange={handleTabChange} centered indicatorColor="primary" textColor="primary">
-                    <Tab label="Categories" />
-                    <Tab label="Products" />
-                </Tabs>
-            </Paper>
-
-            <Box sx={{ mt: 2 }}>
-                {tabIndex === 0 && (
-                    <GraphQLUniformEntityManager 
-                        entityName="Category" 
-                    />
-                )}
-                {tabIndex === 1 && (
-                    <GraphQLUniformEntityManager 
-                        entityName="Product" 
-                        relations={[
-                            { field: "CategoryId", resource: "categories", labelField: "Name" }
-                        ]}
-                    />
-                )}
-            </Box>
-        </Box>
+            <TabStrip selected={selected} onSelect={handleSelect}>
+                <TabStripTab title="Products">
+                    <div style={{ marginTop: '20px' }}>
+                        <GraphQLUniformEntityManager 
+                            resource="products"
+                            entityName="Product"
+                            selectOptions={{
+                                CategoryId: {
+                                    resource: 'categories',
+                                    labelField: 'Name'
+                                }
+                            }}
+                        />
+                    </div>
+                </TabStripTab>
+                <TabStripTab title="Categories">
+                    <div style={{ marginTop: '20px' }}>
+                        <GraphQLUniformEntityManager 
+                            resource="categories"
+                            entityName="Category"
+                        />
+                    </div>
+                </TabStripTab>
+            </TabStrip>
+        </div>
     );
 };
-
-export default GraphQLUniformExample;

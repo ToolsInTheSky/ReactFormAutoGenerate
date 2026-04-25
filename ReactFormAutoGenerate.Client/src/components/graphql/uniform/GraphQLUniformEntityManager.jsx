@@ -1,49 +1,25 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Box, Typography, Paper, CircularProgress, Button, Alert,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    IconButton, Collapse, Tooltip, TextField, MenuItem
-} from '@mui/material';
-import { AutoForm, AutoField, SubmitField, ErrorsField } from 'uniforms-mui';
-import { Bridge, connectField } from 'uniforms';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AutoForm } from 'uniforms';
+import { Bridge } from 'uniforms';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import { useNotification } from '@refinedev/core';
-import { useQuery, useQueries, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
-import CloseIcon from '@mui/icons-material/Close';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import { useCreate, useNotification, useInvalidate, useUpdate } from '@refinedev/core';
+import { GraphQLClient, gql } from "graphql-request";
+import axios from "axios";
 
-// Initialize AJV for schema validation
+import { Grid, GridColumn } from "@progress/kendo-react-grid";
+import { Button } from "@progress/kendo-react-buttons";
+import { Loader } from "@progress/kendo-react-indicators";
+import { Card, CardBody, CardTitle } from "@progress/kendo-react-layout";
+import { plusIcon, arrowRotateCwIcon, xIcon, pencilIcon } from "@progress/kendo-svg-icons";
+import { SvgIcon } from "@progress/kendo-react-common";
+
+import { TextField, NumberField, SelectField, BoolField, SubmitField, ErrorsField } from '../../common/uniforms-kendo/Fields';
+
 const ajv = new Ajv({ allErrors: true, useDefaults: true, strict: false });
 addFormats(ajv);
 
-/**
- * CustomSelectField for Uniforms
- * A custom Material UI select field connected to the Uniforms system.
- */
-const CustomSelectField = connectField(({ 
-    value, onChange, label, allowedValues, transform, required, error, errorMessage
-}) => (
-    <TextField
-        select fullWidth label={label} value={value ?? ""}
-        onChange={e => onChange(e.target.value)}
-        error={!!error} helperText={error ? errorMessage : ""}
-        required={required} margin="normal" variant="outlined"
-    >
-        {allowedValues?.map(val => (
-            <MenuItem key={val} value={val}>{transform ? transform(val) : val}</MenuItem>
-        ))}
-    </TextField>
-));
-
-/**
- * Robust Bridge for GraphQL + Uniforms
- * Bridges the JSON Schema and the Uniforms form system.
- */
-class RobustGraphQLBridge extends Bridge {
+class RobustCustomBridge extends Bridge {
     constructor(schema, validator, overrides = {}) {
         super();
         this.schema = schema;
@@ -56,7 +32,7 @@ class RobustGraphQLBridge extends Bridge {
     getField(name) { return this.schema.properties[name]; }
     getInitialValue(name) {
         const field = this.getField(name);
-        if (this.overrides[name]?.allowedValues?.length > 0) return this.overrides[name].allowedValues[0];
+        if (this.overrides[name]?.options?.length > 0) return this.overrides[name].options[0].value;
         if (field?.type === 'integer' || field?.type === 'number') return 0;
         return '';
     }
@@ -72,23 +48,26 @@ class RobustGraphQLBridge extends Bridge {
     getType(name) {
         const field = this.getField(name);
         if (field?.type === 'integer' || field?.type === 'number') return Number;
+        if (field?.type === 'boolean') return Boolean;
         return String;
     }
     getValidator() { return this.validator; }
 }
 
-/**
- * GraphQLUniformEntityManager Component
- * Generic manager for handling GraphQL CRUD operations with Uniforms.
- */
-export const GraphQLUniformEntityManager = ({ entityName, relations = [] }) => {
+export const GraphQLUniformEntityManager = ({ entityName, selectOptions = {} }) => {
+    const [schema, setSchema] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [fetchError, setFetchError] = useState(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
-    const queryClient = useQueryClient();
+    const [records, setRecords] = useState([]);
+    const [resolvedSelectOptions, setResolvedSelectOptions] = useState(selectOptions);
 
-    /**
-     * Helper Utilities for Naming Conventions
-     */
+    const client = useMemo(() => new GraphQLClient(window.location.origin + "/graphql"), []);
+    const { mutate: createMutation, isLoading: isCreating } = useCreate();
+    const { mutate: updateMutation, isLoading: isUpdating } = useUpdate();
+    const { open } = useNotification();
+    
     const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
     const toPluralCamelCase = (name) => {
         const camel = name.charAt(0).toLowerCase() + name.slice(1);
@@ -97,192 +76,159 @@ export const GraphQLUniformEntityManager = ({ entityName, relations = [] }) => {
         return camel + "s";
     };
 
-    /**
-     * Section 1: Schema Fetching
-     * Retrieves the JSON Schema specifically formatted for Uniforms.
-     */
-    const { data: schema, isLoading: isSchemaLoading, error: schemaError } = useQuery({
-        queryKey: ["gql-schema", entityName, "uniforms"],
-        queryFn: async () => {
-            const query = `query { jsonSchema(entityName: "${entityName}", protocol: "uniforms") }`;
+    const fetchSchema = useCallback(async () => {
+        try {
+            const query = gql`query GetSchema($name: String!, $proto: String!) { jsonSchema(entityName: $name, protocol: $proto) }`;
+            const response = await client.request(query, { name: entityName, proto: "uniforms" });
+            setSchema(JSON.parse(response.jsonSchema));
+        } catch (err) { setFetchError(err.message); }
+        finally { setLoading(false); }
+    }, [client, entityName]);
+
+    const fetchData = useCallback(async () => {
+        if (!schema) return;
+        try {
+            const fields = Object.keys(schema.properties)
+                .filter(k => k !== 'Products' && k !== 'Category' && k !== 'Id')
+                .map(toCamelCase).join("\n");
+            const qName = toPluralCamelCase(entityName);
+            const query = `query { ${qName} { items { id ${fields} } } }`;
             const res = await axios.post("/graphql", { query });
-            return JSON.parse(res.data.data.jsonSchema);
-        }
-    });
-
-    /**
-     * Section 2: Relational Data Lookup
-     * Parallel fetching of data for dropdown menus.
-     */
-    const lookupQueries = useQueries({
-        queries: relations.map(rel => ({
-            queryKey: ["gql-lookup", rel.resource],
-            queryFn: async () => {
-                const qName = toPluralCamelCase(rel.resource);
-                const labelField = toCamelCase(rel.labelField);
-                const query = `query { ${qName} { items { id ${labelField} } } }`;
-                const res = await axios.post("/graphql", { query });
-                const items = res.data?.data?.[qName]?.items || [];
-                return items.map(item => ({
-                    value: item.id,
-                    label: String(item[labelField] || item.id)
-                }));
-            }
-        }))
-    });
-
-    // Transform lookup data into Uniforms select options
-    const selectOptions = useMemo(() => {
-        const options = {};
-        lookupQueries.forEach((res, index) => {
-            if (res.data) {
-                const rel = relations[index];
-                options[rel.field] = {
-                    allowedValues: res.data.map(o => o.value),
-                    transform: (val) => res.data.find(o => o.value === val)?.label || val
-                };
-            }
-        });
-        return options;
-    }, [lookupQueries, relations]);
-
-    /**
-     * Section 3: Data Fetching (Main List)
-     * Dynamically constructs a query to fetch entity records based on schema properties.
-     */
-    const dynamicQuery = useMemo(() => {
-        if (!schema) return null;
-        const fields = Object.keys(schema.properties)
-            .filter(k => !['Products', 'Category', 'Id'].includes(k))
-            .map(toCamelCase).join("\n") + "\nid";
-        const qName = toPluralCamelCase(entityName);
-        return `query { ${qName} { items { ${fields} } } }`;
+            setRecords(res.data?.data?.[qName]?.items || []);
+        } catch (err) { console.error(err); }
     }, [schema, entityName]);
 
-    const { data: listData, isLoading: isListLoading, refetch } = useQuery({
-        queryKey: ["gql-data-uniforms", entityName],
-        queryFn: async () => {
-            const res = await axios.post("/graphql", { query: dynamicQuery });
-            return res.data.data[toPluralCamelCase(entityName)].items;
-        },
-        enabled: !!dynamicQuery
-    });
-
-    /**
-     * Section 4: Mutation Logic
-     * Handles both Create and Update operations using dynamically built mutation strings.
-     */
-    const mutation = useMutation({
-        mutationFn: async (formData) => {
-            const isCreate = !selectedId;
-            const operation = isCreate ? `Create${entityName}` : `Update${entityName}`;
-            
-            const argsMap = new Map();
-            if (selectedId) argsMap.set("id", selectedId);
-            
-            Object.keys(formData).forEach(key => {
-                const gqlKey = toCamelCase(key);
-                if (gqlKey === "id") return; // Explicitly handle id
-                
-                const val = formData[key];
-                if (typeof val === 'number') argsMap.set(gqlKey, val);
-                else argsMap.set(gqlKey, `"${val}"`);
-            });
-
-            const argsString = Array.from(argsMap.entries())
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(", ");
-
-            const query = `mutation { ${toCamelCase(operation)}(${argsString}) { id } }`;
-            const res = await axios.post("/graphql", { query });
-            if (res.data.errors) throw new Error(res.data.errors[0].message);
-            return res.data;
-        },
-        onSuccess: () => {
-            // Refresh the data list and close the form on success
-            queryClient.invalidateQueries(["gql-data-uniforms"]);
-            setIsFormOpen(false);
-            setSelectedId(null);
+    const fetchRelations = useCallback(async () => {
+        const newOptions = { ...selectOptions };
+        for (const key of Object.keys(selectOptions)) {
+            const opt = selectOptions[key];
+            if (opt.resource) {
+                const qName = toPluralCamelCase(opt.resource);
+                const lField = toCamelCase(opt.labelField || 'Name');
+                const query = `query { ${qName} { items { id ${lField} } } }`;
+                const res = await axios.post("/graphql", { query });
+                const items = (res.data?.data?.[qName]?.items || []).map(item => ({
+                    label: item[lField] || item.id,
+                    value: item.id
+                }));
+                newOptions[key] = { ...opt, options: items };
+            }
         }
-    });
+        setResolvedSelectOptions(newOptions);
+    }, [selectOptions]);
 
-    /**
-     * Section 5: Form Bridge and Model Preparation
-     */
+    useEffect(() => { fetchSchema(); fetchRelations(); }, [fetchSchema, fetchRelations]);
+    useEffect(() => { if (schema) fetchData(); }, [schema, fetchData]);
+
+    const formModel = useMemo(() => {
+        if (selectedId) {
+            const item = records.find(r => r.id === selectedId);
+            if (!item) return {};
+            const mapped = {};
+            if (schema?.properties) {
+                Object.keys(schema.properties).forEach(key => {
+                    const val = item[toCamelCase(key)] ?? item[key];
+                    if (val !== undefined) mapped[key] = val;
+                });
+            }
+            return mapped;
+        }
+        return {};
+    }, [selectedId, records, schema]);
+
     const bridge = useMemo(() => {
         if (!schema) return null;
         const validate = ajv.compile(schema);
-        const validator = (data) => validate(data) ? null : { details: validate.errors };
-        return new RobustGraphQLBridge(schema, validator, selectOptions);
-    }, [schema, selectOptions]);
+        const validator = (data) => {
+            const valid = validate(data);
+            if (valid) return null;
+            return { details: validate.errors };
+        };
+        return new RobustCustomBridge(schema, validator, resolvedSelectOptions);
+    }, [schema, resolvedSelectOptions]);
 
-    const formModel = useMemo(() => {
-        if (selectedId && listData) {
-            const item = listData.find(i => i.id === selectedId);
-            if (!item) return {};
-            const model = {};
-            Object.keys(schema.properties).forEach(key => {
-                const val = item[toCamelCase(key)] ?? item[key];
-                if (val !== undefined) model[key] = val;
-            });
-            return model;
-        }
-        return {};
-    }, [selectedId, listData, schema]);
+    const onSubmit = (formData) => {
+        const mutation = selectedId ? updateMutation : createMutation;
+        const gqlData = {};
+        Object.keys(formData).forEach(k => { gqlData[toCamelCase(k)] = formData[k]; });
+        const payload = { resource: toPluralCamelCase(entityName), values: gqlData, meta: { dataProviderName: "graphql" } };
+        if (selectedId) payload.id = selectedId;
+        mutation(payload, {
+            onSuccess: () => {
+                open?.({ type: "success", message: `Entity ${selectedId ? 'updated' : 'created'} successfully.` });
+                setIsFormOpen(false); setSelectedId(null); fetchData();
+            },
+            onError: (err) => open?.({ type: "error", message: err.message })
+        });
+    };
 
-    if (isSchemaLoading) return <Box sx={{ p: 5, textAlign: 'center' }}><CircularProgress /></Box>;
-    if (schemaError) return <Alert severity="error">Schema Error: {schemaError.message}</Alert>;
+    if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
+    if (fetchError) return <div style={{ color: 'red', padding: '20px' }}>Schema Error: {fetchError}</div>;
 
-    // List of fields to display (excluding system properties)
-    const fields = schema ? Object.keys(schema.properties).filter(k => !['Products', 'Category', 'Id'].includes(k)) : [];
+    const fields = schema ? Object.keys(schema.properties).filter(k => k !== 'Products' && k !== 'Category' && k !== 'Id') : [];
 
     return (
-        <Box sx={{ width: '100%' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mt: 2 }}>
-                
-                {/* Collapsible Form Section */}
-                <Collapse in={isFormOpen} sx={{ width: '100%', maxWidth: 600 }}>
-                    <Paper sx={{ p: 4, mb: 4, position: 'relative' }}>
-                        <IconButton onClick={() => { setIsFormOpen(false); setSelectedId(null); }} sx={{ position: 'absolute', right: 8, top: 8 }}><CloseIcon /></IconButton>
-                        <Typography variant="h6" gutterBottom>{selectedId ? `Edit ${entityName}` : `Add New ${entityName}`}</Typography>
-                        {bridge && (
-                            <AutoForm schema={bridge} model={formModel} onSubmit={data => mutation.mutate(data)} disabled={mutation.isLoading}>
-                                {fields.map(name => selectOptions[name] ? <CustomSelectField key={name} name={name} {...selectOptions[name]} /> : <AutoField key={name} name={name} />)}
-                                <ErrorsField /><Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}><SubmitField /></Box>
-                            </AutoForm>
-                        )}
-                    </Paper>
-                </Collapse>
+        <div style={{ width: '100%' }}>
+            {isFormOpen && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+                    <Card style={{ width: '100%', maxWidth: '600px' }}>
+                        <CardBody>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <CardTitle>{selectedId ? `Edit ${entityName} (ID: ${selectedId})` : `Add New ${entityName}`}</CardTitle>
+                                <Button fillMode="flat" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}><SvgIcon icon={xIcon} /></Button>
+                            </div>
+                            {bridge && (
+                                <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit} disabled={isCreating || isUpdating}>
+                                    {fields.map(name => {
+                                        const isIdField = name.toLowerCase() === 'id';
+                                        
+                                        // 생성 모드에서 ID 필드는 렌더링하지 않음
+                                        if (isIdField && !selectedId) return null;
 
-                {/* Top Action Bar */}
-                <Box sx={{ width: '100%', maxWidth: 800, display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 1 }}>
-                    <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => refetch()}>Refresh</Button>
-                    {!isFormOpen && <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelectedId(null); setIsFormOpen(true); }}>Create New</Button>}
-                </Box>
+                                        const prop = bridge.getProps(name);
+                                        const fieldProps = {
+                                            key: name,
+                                            name: name,
+                                            // 수정 모드에서 ID 필드는 비활성화
+                                            disabled: isIdField && !!selectedId
+                                        };
 
-                {/* Data Table */}
-                <Paper sx={{ p: 4, width: '100%', maxWidth: 800 }}>
-                    <Typography variant="h6" gutterBottom>{entityName} List (GraphQL + Uniforms)</Typography>
-                    <TableContainer>
-                        <Table sx={{ minWidth: 400 }}>
-                            <TableHead><TableRow><TableCell>ID</TableCell>{fields.map(col => <TableCell key={col}>{col}</TableCell>)}<TableCell align="right">Actions</TableCell></TableRow></TableHead>
-                            <TableBody>
-                                {isListLoading ? <TableRow><TableCell colSpan={fields.length + 2} align="center"><CircularProgress size={20} /></TableCell></TableRow> :
-                                 listData?.length > 0 ? listData.map((row) => (
-                                    <TableRow key={row.id} hover onClick={() => { setSelectedId(row.id); setIsFormOpen(true); }} style={{ cursor: 'pointer' }} selected={selectedId === row.id}>
-                                        <TableCell>{row.id}</TableCell>
-                                        {fields.map(col => {
-                                            const val = row[toCamelCase(col)] ?? row[col];
-                                            return <TableCell key={col}>{selectOptions[col]?.transform ? selectOptions[col].transform(val) : String(val ?? '')}</TableCell>;
-                                        })}
-                                        <TableCell align="right"><Tooltip title="Edit"><IconButton size="small"><EditIcon fontSize="small" /></IconButton></Tooltip></TableCell>
-                                    </TableRow>
-                                )) : <TableRow><TableCell colSpan={fields.length + 2} align="center">No Data Found</TableCell></TableRow>}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
-            </Box>
-        </Box>
+                                        if (prop.options) return <SelectField {...fieldProps} options={prop.options} />;
+                                        if (prop.type === 'integer' || prop.type === 'number') return <NumberField {...fieldProps} />;
+                                        if (prop.type === 'boolean') return <BoolField {...fieldProps} />;
+                                        return <TextField {...fieldProps} />;
+                                    })}
+                                    <ErrorsField />
+                                    <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                        <Button fillMode="outline" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
+                                        <SubmitField value="Save" />
+                                    </div>
+                                </AutoForm>
+                            )}
+                        </CardBody>
+                    </Card>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0 }}>{entityName} List ({records.length} items)</h3>
+                <div>
+                    <Button fillMode="outline" onClick={fetchData} style={{ marginRight: '10px' }}><SvgIcon icon={arrowRotateCwIcon} /> Refresh</Button>
+                    <Button themeColor="primary" onClick={() => { setSelectedId(null); setIsFormOpen(true); }}><SvgIcon icon={plusIcon} /> Create New</Button>
+                </div>
+            </div>
+
+            <Grid data={records} style={{ height: '400px' }} onRowClick={(e) => { setSelectedId(e.dataItem.id); setIsFormOpen(true); }}>
+                <GridColumn field="id" title="ID" width="80px" />
+                {fields.map(col => (
+                    <GridColumn key={col} field={toCamelCase(col)} title={col.toUpperCase()} cell={(props) => {
+                        const val = props.dataItem[toCamelCase(col)] ?? props.dataItem[col];
+                        const opt = resolvedSelectOptions[col];
+                        const displayVal = opt?.options?.find(o => o.value === val)?.label || val;
+                        return <td {...props.tdProps}>{String(displayVal ?? '')}</td>;
+                    }} />
+                ))}
+            </Grid>
+        </div>
     );
 };

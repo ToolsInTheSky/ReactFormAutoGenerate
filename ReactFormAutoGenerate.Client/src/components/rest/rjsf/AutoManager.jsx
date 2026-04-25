@@ -1,21 +1,11 @@
 import React, { useState, useMemo } from "react";
-import { List as RefineList } from "@refinedev/mui";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import axios from "axios";
-import { 
-  Box, 
-  CircularProgress, 
-  Button, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow, 
-  Paper
-} from "@mui/material";
-import AddIcon from "@mui/icons-material/Add";
-import RefreshIcon from "@mui/icons-material/Refresh";
+import { Grid, GridColumn } from "@progress/kendo-react-grid";
+import { Button } from "@progress/kendo-react-buttons";
+import { Loader } from "@progress/kendo-react-indicators";
+import { plusIcon, arrowRotateCwIcon } from "@progress/kendo-svg-icons";
+import { SvgIcon } from "@progress/kendo-react-common";
 import AutoForm from "./AutoForm";
 
 const api = axios.create({ baseURL: "/api" });
@@ -25,49 +15,41 @@ const api = axios.create({ baseURL: "/api" });
  */
 const getVal = (obj, key) => {
   if (!obj) return "";
-  const foundKey = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
-  return foundKey ? obj[foundKey] : "";
+  const camelKey = key.charAt(0).toLowerCase() + key.slice(1);
+  const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
+  
+  if (obj[camelKey] !== undefined) return obj[camelKey];
+  if (obj[pascalKey] !== undefined) return obj[pascalKey];
+  if (obj[key] !== undefined) return obj[key];
+  
+  return "";
 };
 
-/**
- * AutoManager Component
- * Provides a complete CRUD dashboard for a specific resource.
- * It combines a data table for listing and the AutoForm for creation/editing.
- */
 const AutoManager = ({ resource, schemaKey, relations = [] }) => {
-  // --- 1. State Management ---
   const [editingId, setEditingId] = useState(null);
   const [selectedRecord, setSelectedRecord] = useState(null);
 
-  // --- 2. Data Fetching (React Query) ---
-  
-  // Fetch the JSON Schema for the current entity
+  // Fetch the JSON Schema
   const { data: schema } = useQuery({
     queryKey: ["schema", schemaKey],
     queryFn: () => api.get(`/schema/rjsf/${schemaKey}`).then(res => res.data)
   });
 
-  // Fetch all records for the list view
+  // Fetch all records
   const { data: recordsRaw, isLoading, refetch } = useQuery({
     queryKey: [resource],
     queryFn: () => api.get(`/${resource}`).then(res => res.data)
   });
 
-  const records = useMemo(() => Array.isArray(recordsRaw) ? recordsRaw : (recordsRaw?.data || []), [recordsRaw]);
+  const records = useMemo(() => {
+    return Array.isArray(recordsRaw) ? recordsRaw : (recordsRaw?.data || []);
+  }, [recordsRaw]);
 
-  // Fetch labels for foreign key fields (e.g., displaying Category Name instead of ID)
+  // Fetch labels for foreign key fields
   const lookupQueriesResults = useQueries({
     queries: relations.map(rel => ({
       queryKey: [rel.resource],
       queryFn: () => api.get(`/${rel.resource}`).then(res => res.data),
-      select: (data) => {
-        const list = Array.isArray(data) ? data : (data.data || []);
-        const map = {};
-        list.forEach(item => {
-          map[item.id || item.Id || item.ID] = item[rel.labelField] || item.Name || item.name;
-        });
-        return map;
-      }
     }))
   });
 
@@ -76,63 +58,103 @@ const AutoManager = ({ resource, schemaKey, relations = [] }) => {
     lookupQueriesResults.forEach((res, index) => {
       if (res.data) {
         const field = relations[index].field.toLowerCase();
-        maps[field] = res.data;
+        const list = Array.isArray(res.data) ? res.data : (res.data.data || []);
+        const map = {};
+        list.forEach(item => {
+          const id = item.id ?? item.Id ?? item.ID;
+          map[id] = item[relations[index].labelField] || item.Name || item.name;
+        });
+        maps[field] = map;
       }
     });
     return maps;
   }, [lookupQueriesResults, relations]);
 
-  // --- 3. Dynamic Column Generation ---
-  // Exclude navigation properties from the table columns
-  const columns = schema?.properties ? Object.keys(schema.properties).filter(key => 
-    !["category", "products", "Category", "Products"].includes(key.toLowerCase())
-  ) : [];
+  const columns = useMemo(() => {
+    if (!schema?.properties) return [];
+    return Object.keys(schema.properties).filter(key => 
+      !["category", "products", "Category", "Products"].includes(key.toLowerCase())
+    );
+  }, [schema]);
+
+  const onRowClick = (event) => {
+    const id = getVal(event.dataItem, "id");
+    setEditingId(id);
+    setSelectedRecord(event.dataItem);
+  };
 
   return (
-    <Box sx={{ p: 2 }}>
-      {/* --- 4. Dynamic Form Section --- */}
+    <div style={{ padding: '10px' }}>
       {editingId !== null && (
-        <AutoForm id={editingId === "new" ? undefined : editingId} action={editingId === "new" ? "create" : "edit"}
-          schema={schema} resource={resource} record={selectedRecord} onCancel={() => setEditingId(null)} relations={relations}
-        />
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+          <div style={{ 
+            width: '100%', 
+            maxWidth: '600px', 
+            padding: '20px', 
+            border: '1px solid #ddd', 
+            borderRadius: '8px', 
+            backgroundColor: '#fff',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)' 
+          }}>
+            <AutoForm 
+              id={editingId === "new" ? undefined : editingId} 
+              action={editingId === "new" ? "create" : "edit"}
+              schema={schema} 
+              resource={resource} 
+              record={selectedRecord} 
+              onCancel={() => setEditingId(null)} 
+              relations={relations}
+            />
+          </div>
+        </div>
       )}
 
-      {/* --- 5. Data List Section --- */}
-      <RefineList title={`${resource} Management`}
-        headerButtons={
-          <>
-            <Button variant="outlined" startIcon={<RefreshIcon />} onClick={() => refetch()} sx={{ mr: 1 }}>Refresh</Button>
-            <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditingId("new"); setSelectedRecord(null); }}>Create New</Button>
-          </>
-        }
-      >
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead><TableRow>{columns.map(col => <TableCell key={col}>{col.toUpperCase()}</TableCell>)}</TableRow></TableHead>
-            <TableBody>
-              {isLoading ? <TableRow><TableCell colSpan={columns.length || 1} align="center"><CircularProgress size={20} /></TableCell></TableRow> :
-                records.length === 0 ? <TableRow><TableCell colSpan={columns.length || 1} align="center">No row found</TableCell></TableRow> :
-                records.map((row) => (
-                  <TableRow 
-                    key={String(getVal(row, "id"))} 
-                    hover 
-                    onClick={() => { setEditingId(getVal(row, "id")); setSelectedRecord(row); }} 
-                    style={{ cursor: 'pointer' }} 
-                    selected={editingId === getVal(row, "id")}
-                  >
-                    {columns.map(col => {
-                      const val = getVal(row, col);
-                      // Display lookup label if available, otherwise raw value
-                      return <TableCell key={col}>{lookups[col.toLowerCase()]?.[val] || String(val ?? "")}</TableCell>;
-                    })}
-                  </TableRow>
-                ))
-              }
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </RefineList>
-    </Box>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+        <h3 style={{ margin: 0 }}>{resource.toUpperCase()} Management</h3>
+        <div>
+          <Button fillMode="outline" onClick={() => refetch()} style={{ marginRight: '10px' }}>
+            <SvgIcon icon={arrowRotateCwIcon} /> Refresh
+          </Button>
+          <Button themeColor="primary" onClick={() => { setEditingId("new"); setSelectedRecord(null); }}>
+            <SvgIcon icon={plusIcon} /> Create New
+          </Button>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}>
+          <Loader size="large" type="pulsing" />
+        </div>
+      ) : (
+        <Grid
+          data={records}
+          style={{ height: '400px' }}
+          onRowClick={onRowClick}
+        >
+          {columns.map(col => {
+            const camelField = col.charAt(0).toLowerCase() + col.slice(1);
+            return (
+              <GridColumn 
+                key={col} 
+                field={camelField} 
+                title={col.toUpperCase()} 
+                cell={(props) => {
+                  const dataItem = props.dataItem;
+                  const rawVal = dataItem[camelField] ?? dataItem[col] ?? "";
+                  const displayVal = lookups[col.toLowerCase()]?.[rawVal] ?? String(rawVal);
+                  
+                  return (
+                    <td style={props.style} className={props.className}>
+                      {displayVal === "null" ? "" : displayVal}
+                    </td>
+                  );
+                }}
+              />
+            );
+          })}
+        </Grid>
+      )}
+    </div>
   );
 };
 

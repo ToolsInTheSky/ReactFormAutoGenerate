@@ -1,64 +1,22 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { 
-    Box, Typography, Paper, CircularProgress, Button, Alert,
-    Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    IconButton, Collapse, Tooltip, TextField, MenuItem
-} from '@mui/material';
-import { AutoForm, AutoField, SubmitField, ErrorsField } from 'uniforms-mui';
-import { Bridge, connectField } from 'uniforms';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { AutoForm } from 'uniforms';
+import { Bridge } from 'uniforms';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import { useCreate, useNotification, useList, useInvalidate, useUpdate } from '@refinedev/core';
-import CloseIcon from '@mui/icons-material/Close';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
 
-// Initialize AJV for schema validation
+import { Grid, GridColumn } from "@progress/kendo-react-grid";
+import { Button } from "@progress/kendo-react-buttons";
+import { Loader } from "@progress/kendo-react-indicators";
+import { Card, CardBody, CardTitle } from "@progress/kendo-react-layout";
+import { plusIcon, arrowRotateCwIcon, xIcon, pencilIcon } from "@progress/kendo-svg-icons";
+import { SvgIcon } from "@progress/kendo-react-common";
+
+import { TextField, NumberField, SelectField, BoolField, SubmitField, ErrorsField } from '../../common/uniforms-kendo/Fields';
+
 const ajv = new Ajv({ allErrors: true, useDefaults: true, strict: false });
 addFormats(ajv);
 
-/**
- * CustomSelectField
- * A custom selection component that filters props to prevent DOM warnings.
- * Used for foreign key relationships (e.g., CategoryId in Product).
- */
-const CustomSelectField = connectField(({ 
-    value, 
-    onChange, 
-    label, 
-    allowedValues, 
-    transform, 
-    required, 
-    error, 
-    showInlineError, 
-    errorMessage,
-    ...props 
-}) => (
-    <TextField
-        select
-        fullWidth
-        label={label}
-        value={value ?? ""}
-        onChange={e => onChange(e.target.value)}
-        error={!!error}
-        helperText={error ? errorMessage : ""}
-        required={required}
-        margin="normal"
-        variant="outlined"
-    >
-        {allowedValues?.map(val => (
-            <MenuItem key={val} value={val}>
-                {transform ? transform(val) : val}
-            </MenuItem>
-        ))}
-    </TextField>
-));
-
-/**
- * RobustCustomBridge
- * A custom Uniforms bridge to handle JSON Schema and AJV validation.
- * It provides field metadata, types, and validation logic to the form.
- */
 class RobustCustomBridge extends Bridge {
     constructor(schema, validator, overrides = {}) {
         super();
@@ -66,112 +24,62 @@ class RobustCustomBridge extends Bridge {
         this.validator = validator;
         this.overrides = overrides; 
     }
-
-    getError(name, error) {
-        return error?.details?.find(e => e.instancePath === `/${name}` || e.params?.missingProperty === name) || null;
-    }
-
-    getErrorMessage(name, error) {
-        return this.getError(name, error)?.message || '';
-    }
-
-    getErrorMessages(error) {
-        return error?.details?.map(e => e.message) || [];
-    }
-
-    getField(name) {
-        return this.schema.properties[name];
-    }
-
+    getError(name, error) { return error?.details?.find(e => e.instancePath === `/${name}` || e.params?.missingProperty === name) || null; }
+    getErrorMessage(name, error) { return this.getError(name, error)?.message || ''; }
+    getErrorMessages(error) { return error?.details?.map(e => e.message) || []; }
+    getField(name) { return this.schema.properties[name]; }
     getInitialValue(name) {
         const field = this.getField(name);
-        if (this.overrides[name]?.allowedValues?.length > 0) return this.overrides[name].allowedValues[0];
+        if (this.overrides[name]?.options?.length > 0) return this.overrides[name].options[0].value;
         if (field?.type === 'integer' || field?.type === 'number') return 0;
         return '';
     }
-
     getProps(name) {
         const field = this.getField(name) || {};
         const override = this.overrides[name] || {};
-        
-        return {
-            label: name,
-            required: this.schema.required?.includes(name),
-            ...field,
-            ...override
-        };
+        return { label: name, required: this.schema.required?.includes(name), ...field, ...override };
     }
-
     getSubfields(name) {
         const excluded = ['Id', 'Products', 'Category'];
         return name ? [] : Object.keys(this.schema.properties).filter(key => !excluded.includes(key));
     }
-
     getType(name) {
         const field = this.getField(name);
         if (field?.type === 'integer' || field?.type === 'number') return Number;
+        if (field?.type === 'boolean') return Boolean;
         return String;
     }
-
-    getValidator() {
-        return this.validator;
-    }
+    getValidator() { return this.validator; }
 }
 
-/**
- * UniformEntityManager Component
- * Generic manager for handling CRUD operations on any resource using JSON Schema.
- * It automatically generates forms based on the schema and displays data in a table.
- */
 export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions = {} }) => {
-    // Component State
     const [schema, setSchema] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
-    const [rawApiData, setRawApiData] = useState([]); // Backup data for when Refine list is empty
+    const [rawApiData, setRawApiData] = useState([]);
+    const [resolvedSelectOptions, setResolvedSelectOptions] = useState(selectOptions);
 
-    // Refine Hooks
     const { mutate: createMutation, isLoading: isCreating } = useCreate();
     const { mutate: updateMutation, isLoading: isUpdating } = useUpdate();
     const invalidate = useInvalidate();
     const { open } = useNotification();
     
-    // Fetch resource list via Refine
-    const { data: listData, isLoading: isListLoading } = useList({
-        resource: resource,
-    });
+    const { data: listData, isLoading: isListLoading } = useList({ resource });
 
-    /**
-     * Refreshes the data list by invalidating cache and re-fetching raw API data
-     */
     const handleRefresh = () => {
         invalidate({ resource, invalidates: ["list", "detail"] });
         fetchBackupData();
     };
 
-    /**
-     * Fallback fetch directly from API to ensure data is displayed
-     */
-    const fetchBackupData = () => {
-        fetch(`/api/${resource}`)
-            .then(res => res.json())
-            .then(data => setRawApiData(Array.isArray(data) ? data : []))
+    const fetchBackupData = useCallback(() => {
+        fetch(`/api/${resource}`).then(res => res.json()).then(data => setRawApiData(Array.isArray(data) ? data : []))
             .catch(err => console.error(`DEBUG: Manual fetch error for ${resource}:`, err));
-    };
+    }, [resource]);
 
-    /**
-     * Consolidate entities from Refine or backup source
-     */
-    const entities = useMemo(() => {
-        if (listData?.data && Array.isArray(listData.data)) return listData.data;
-        return rawApiData;
-    }, [listData, rawApiData]);
+    const entities = useMemo(() => (listData?.data && Array.isArray(listData.data)) ? listData.data : rawApiData, [listData, rawApiData]);
 
-    /**
-     * Prepares the form model when editing an existing entity
-     */
     const formModel = useMemo(() => {
         if (selectedId) {
             const item = entities.find(e => (e.id || e.Id) === selectedId);
@@ -188,24 +96,29 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
         return {};
     }, [selectedId, entities, schema]);
 
-    // Initial data and schema fetch
     useEffect(() => {
         fetchBackupData();
-        fetch(schemaUrl)
-            .then(res => res.json())
-            .then(data => {
-                setSchema(data);
-                setLoading(false);
-            })
-            .catch(err => {
-                setFetchError(err.message);
-                setLoading(false);
-            });
+        fetch(schemaUrl).then(res => res.json()).then(data => { setSchema(data); setLoading(false); })
+            .catch(err => { setFetchError(err.message); setLoading(false); });
+
+        // Resolve relational options
+        Object.keys(selectOptions).forEach(key => {
+            const opt = selectOptions[key];
+            if (opt.resource) {
+                fetch(`/api/${opt.resource}`).then(res => res.json()).then(data => {
+                    const items = (Array.isArray(data) ? data : (data.data || [])).map(item => ({
+                        label: item.Name || item.name || item.id,
+                        value: item.id || item.Id || item.ID
+                    }));
+                    setResolvedSelectOptions(prev => ({
+                        ...prev,
+                        [key]: { ...prev[key], options: items }
+                    }));
+                });
+            }
+        });
     }, [schemaUrl]);
 
-    /**
-     * Creates a bridge between the JSON schema and Uniforms form
-     */
     const bridge = useMemo(() => {
         if (!schema) return null;
         const validate = ajv.compile(schema);
@@ -214,129 +127,107 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
             if (valid) return null;
             return { details: validate.errors };
         };
-        return new RobustCustomBridge(schema, validator, selectOptions);
-    }, [schema, selectOptions]);
+        return new RobustCustomBridge(schema, validator, resolvedSelectOptions);
+    }, [schema, resolvedSelectOptions]);
 
-    /**
-     * Handles form submission for both Create and Update operations
-     */
     const onSubmit = (formData) => {
         const mutation = selectedId ? updateMutation : createMutation;
         const payload = { resource, values: formData };
         if (selectedId) payload.id = selectedId;
-
         mutation(payload, {
             onSuccess: () => {
-                open?.({
-                    type: "success",
-                    message: "Success!",
-                    description: `Entity has been ${selectedId ? 'updated' : 'created'} successfully.`,
-                });
-                setIsFormOpen(false);
-                setSelectedId(null);
-                handleRefresh();
+                open?.({ type: "success", message: `Entity ${selectedId ? 'updated' : 'created'} successfully.` });
+                setIsFormOpen(false); setSelectedId(null); handleRefresh();
             },
-            onError: (err) => open?.({ type: "error", message: "Error", description: err.message })
+            onError: (err) => open?.({ type: "error", message: err.message })
         });
     };
 
-    if (loading) return <Box sx={{ p: 5, textAlign: 'center' }}><CircularProgress /></Box>;
-    if (fetchError) return <Alert severity="error">Schema Error: {fetchError}</Alert>;
+    if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
+    if (fetchError) return <div style={{ color: 'red', padding: '20px' }}>Schema Error: {fetchError}</div>;
 
-    // Filter fields to exclude system/navigation properties
     const fields = schema ? Object.keys(schema.properties).filter(k => k !== 'Products' && k !== 'Category' && k !== 'Id') : [];
 
     return (
-        <Box sx={{ width: '100%' }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, mt: 2 }}>
-                
-                {/* Expandable Form Section */}
-                <Collapse in={isFormOpen} sx={{ width: '100%', maxWidth: 600 }}>
-                    <Paper sx={{ p: 4, mb: 4, position: 'relative' }}>
-                        <IconButton 
-                            onClick={() => { setIsFormOpen(false); setSelectedId(null); }}
-                            sx={{ position: 'absolute', right: 8, top: 8 }}
-                        >
-                            <CloseIcon />
-                        </IconButton>
-                        <Typography variant="h6" gutterBottom>
-                            {selectedId ? `Edit ${title} (ID: ${selectedId})` : `Add New ${title}`}
-                        </Typography>
-                        {bridge && (
-                            <AutoForm 
-                                schema={bridge} 
-                                model={formModel}
-                                onSubmit={onSubmit}
-                                disabled={isCreating || isUpdating}
-                            >
-                                {fields.map(name => {
-                                    if (selectOptions[name]) {
-                                        return <CustomSelectField key={name} name={name} {...selectOptions[name]} />;
-                                    }
-                                    return <AutoField key={name} name={name} />;
-                                })}
-                                <ErrorsField />
-                                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                                    <SubmitField />
-                                </Box>
-                            </AutoForm>
-                        )}
-                    </Paper>
-                </Collapse>
+        <div style={{ width: '100%' }}>
+            {isFormOpen && (
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+                    <Card style={{ width: '100%', maxWidth: '600px' }}>
+                        <CardBody>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                                <CardTitle>{selectedId ? `Edit ${title} (ID: ${selectedId})` : `Add New ${title}`}</CardTitle>
+                                <Button fillMode="flat" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>
+                                    <SvgIcon icon={xIcon} />
+                                </Button>
+                            </div>
+                            {bridge && (
+                                <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit} disabled={isCreating || isUpdating}>
+                                    {fields.map(name => {
+                                        const isIdField = name.toLowerCase() === 'id';
+                                        
+                                        // 생성 모드에서 ID 필드는 렌더링하지 않음
+                                        if (isIdField && !selectedId) return null;
 
-                {/* Action Buttons */}
-                <Box sx={{ width: '100%', maxWidth: 800, display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 1 }}>
-                    <Button variant="outlined" onClick={handleRefresh} disabled={isListLoading}>Refresh</Button>
-                    {!isFormOpen && (
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => { setSelectedId(null); setIsFormOpen(true); }}>
-                            Create New
-                        </Button>
-                    )}
-                </Box>
+                                        const prop = bridge.getProps(name);
+                                        const fieldProps = {
+                                            key: name,
+                                            name: name,
+                                            // 수정 모드에서 ID 필드는 비활성화
+                                            disabled: isIdField && !!selectedId
+                                        };
 
-                {/* Data Table Section */}
-                <Paper sx={{ p: 4, width: '100%', maxWidth: 800 }}>
-                    <Typography variant="h6" gutterBottom>{title} List ({entities.length} items)</Typography>
-                    <TableContainer>
-                        <Table sx={{ minWidth: 400 }}>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>ID</TableCell>
-                                    {fields.map(col => <TableCell key={col}>{col}</TableCell>)}
-                                    <TableCell align="right">Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {isListLoading && entities.length === 0 ? (
-                                    <TableRow><TableCell colSpan={fields.length + 2} align="center">Loading...</TableCell></TableRow>
-                                ) : entities.length > 0 ? (
-                                    entities.map((row) => (
-                                        <TableRow 
-                                            key={row.id || row.Id}
-                                            hover
-                                            onClick={() => { setSelectedId(row.id || row.Id); setIsFormOpen(true); }}
-                                            style={{ cursor: 'pointer' }}
-                                            selected={selectedId === (row.id || row.Id)}
-                                        >
-                                            <TableCell>{row.id ?? row.Id}</TableCell>
-                                            {fields.map(col => {
-                                                const val = row[col] ?? row[col.charAt(0).toLowerCase() + col.slice(1)];
-                                                const displayVal = selectOptions[col]?.transform ? selectOptions[col].transform(val) : val;
-                                                return <TableCell key={col}>{displayVal ?? ''}</TableCell>;
-                                            })}
-                                            <TableCell align="right">
-                                                <Tooltip title="Edit"><IconButton size="small"><EditIcon fontSize="small" /></IconButton></Tooltip>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow><TableCell colSpan={fields.length + 2} align="center">No Data Found</TableCell></TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                </Paper>
-            </Box>
-        </Box>
+                                        if (prop.options) return <SelectField {...fieldProps} options={prop.options} />;
+                                        if (prop.type === 'integer' || prop.type === 'number') return <NumberField {...fieldProps} />;
+                                        if (prop.type === 'boolean') return <BoolField {...fieldProps} />;
+                                        return <TextField {...fieldProps} />;
+                                    })}
+                                    <ErrorsField />
+                                    <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                                        <Button fillMode="outline" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
+                                        <SubmitField value="Save" />
+                                    </div>
+                                </AutoForm>
+                            )}
+                        </CardBody>
+                    </Card>
+                </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h3 style={{ margin: 0 }}>{title} List ({entities.length} items)</h3>
+                <div>
+                    <Button fillMode="outline" onClick={handleRefresh} style={{ marginRight: '10px' }}>
+                        <SvgIcon icon={arrowRotateCwIcon} /> Refresh
+                    </Button>
+                    <Button themeColor="primary" onClick={() => { setSelectedId(null); setIsFormOpen(true); }}>
+                        <SvgIcon icon={plusIcon} /> Create New
+                    </Button>
+                </div>
+            </div>
+
+            <Grid data={entities} style={{ height: '400px' }} onRowClick={(e) => { setSelectedId(e.dataItem.id || e.dataItem.Id); setIsFormOpen(true); }}>
+                <GridColumn field="id" title="ID" width="80px" cell={(props) => <td style={props.style} className={props.className}>{props.dataItem.id || props.dataItem.Id}</td>} />
+                {fields.map(col => {
+                    const camelField = col.charAt(0).toLowerCase() + col.slice(1);
+                    return (
+                        <GridColumn 
+                            key={col} 
+                            field={camelField} 
+                            title={col.toUpperCase()} 
+                            cell={(props) => {
+                                const val = props.dataItem[camelField] ?? props.dataItem[col] ?? "";
+                                const opt = resolvedSelectOptions[col];
+                                const displayVal = opt?.options?.find(o => String(o.value) === String(val))?.label || val;
+                                return (
+                                    <td style={props.style} className={props.className}>
+                                        {displayVal === "null" ? "" : String(displayVal)}
+                                    </td>
+                                );
+                            }} 
+                        />
+                    );
+                })}
+            </Grid>
+        </div>
     );
 };

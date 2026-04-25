@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Divider } from '@mui/material';
 
 /**
  * SchemaFetcher Component
- * Fetches and displays all available backend schemas, organized by library type (RJSF/Uniforms).
+ * Fetches and displays all available backend schemas (KendoReact Edition).
  */
 function SchemaFetcher() {
     const [schemas, setSchemas] = useState(null);
@@ -29,32 +28,26 @@ function SchemaFetcher() {
         fetchSchemas();
     }, []);
 
-    if (loading) return <Typography>Loading schemas...</Typography>;
-    if (error) return <Typography color="error">Error fetching schemas: {error}</Typography>;
+    if (loading) return <div>Loading schemas...</div>;
+    if (error) return <div style={{ color: 'red' }}>Error fetching schemas: {error}</div>;
 
-    /**
-     * Recursively renders schema categories and their definitions.
-     */
     const renderSchemas = (data, depth = 0) => {
         return Object.entries(data).map(([key, value]) => {
             if (value && typeof value === 'object' && !value.type && !value.properties) {
-                // If it's a category (RJSF, Uniforms), render a heading
                 return (
-                    <Box key={key} sx={{ mt: depth === 0 ? 4 : 2, mb: 2 }}>
-                        <Typography variant={depth === 0 ? "h4" : "h5"} color="primary" gutterBottom>
+                    <div key={key} style={{ marginTop: depth === 0 ? '40px' : '20px', marginBottom: '20px' }}>
+                        <h3 style={{ color: '#ff6358', borderBottom: depth === 0 ? '2px solid #ff6358' : 'none', paddingBottom: '10px' }}>
                             {key} Schemas
-                        </Typography>
-                        {depth === 0 && <Divider sx={{ mb: 2 }} />}
-                        <Box sx={{ ml: depth === 0 ? 0 : 2 }}>
+                        </h3>
+                        <div style={{ marginLeft: depth === 0 ? '0' : '20px' }}>
                             {renderSchemas(value, depth + 1)}
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                 );
             } else {
-                // If it's a specific schema definition, render it in a pre tag
                 return (
-                    <Box key={key} sx={{ mb: 3 }}>
-                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{key}</Typography>
+                    <div key={key} style={{ marginBottom: '30px' }}>
+                        <h4 style={{ fontWeight: 'bold' }}>{key}</h4>
                         <pre style={{ 
                             background: '#f4f4f4', 
                             padding: '15px', 
@@ -66,21 +59,21 @@ function SchemaFetcher() {
                         }}>
                             {JSON.stringify(value, null, 2)}
                         </pre>
-                    </Box>
+                    </div>
                 );
             }
         });
     };
 
     return (
-        <Box sx={{ textAlign: 'left', p: 2 }}>
-            <Typography variant="h3" gutterBottom>Backend Model Schemas</Typography>
-            <Typography variant="body1" color="textSecondary" paragraph>
+        <div style={{ textAlign: 'left', padding: '10px' }}>
+            <h2 style={{ marginBottom: '10px' }}>Backend Model Schemas</h2>
+            <p style={{ color: '#666', marginBottom: '20px' }}>
                 Below are the raw JSON schemas exported from the .NET 9 backend. 
                 Note how they are slightly adjusted for different frontend libraries.
-            </Typography>
+            </p>
             {schemas && renderSchemas(schemas)}
-        </Box>
+        </div>
     );
 }
 

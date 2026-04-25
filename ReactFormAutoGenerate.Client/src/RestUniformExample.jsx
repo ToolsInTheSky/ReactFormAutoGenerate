@@ -1,93 +1,48 @@
-import React, { useState, useMemo } from 'react';
-import { Box, Typography, Tabs, Tab, Paper } from '@mui/material';
-import { useSelect } from '@refinedev/core';
+import React, { useState } from 'react';
+import { TabStrip, TabStripTab } from "@progress/kendo-react-layout";
 import { UniformEntityManager } from './components/rest/uniform/UniformEntityManager';
 
-/**
- * RestUniformExample Component
- * Demonstrates the integration of Refine with UniformEntityManager for CRUD operations
- * on Categories and Products using JSON Schema-driven forms via REST API.
- */
 export const RestUniformExample = () => {
-    // State to manage active tab (0 for Categories, 1 for Products)
-    const [tabIndex, setTabIndex] = useState(0);
+    const [selected, setSelected] = useState(0);
 
-    /**
-     * Handles tab switching between different entity managers
-     */
-    const handleTabChange = (event, newValue) => {
-        setTabIndex(newValue);
+    const handleSelect = (e) => {
+        setSelected(e.selected);
     };
 
-    /**
-     * Data Fetching Section
-     * Pre-fetch Category list for use in the Product management tab
-     * to provide selection options for CategoryId.
-     */
-    const { options: categoryOptions } = useSelect({
-        resource: "categories",
-        optionLabel: "name",
-        optionValue: "id"
-    });
-
-    /**
-     * Select Options Configuration
-     * Maps category data to a format compatible with Uniforms selection fields.
-     */
-    const productSelectOptions = useMemo(() => {
-        if (!categoryOptions || categoryOptions.length === 0) return {};
-        
-        return {
-            CategoryId: {
-                allowedValues: categoryOptions.map(o => o.value),
-                transform: (value) => categoryOptions.find(o => o.value === value)?.label || value,
-            }
-        };
-    }, [categoryOptions]);
-
     return (
-        <Box sx={{ p: 3 }}>
-            {/* Page Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4">REST + Refine + Uniforms</Typography>
-            </Box>
+        <div style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ margin: 0 }}>REST + Refine + Uniforms (KendoReact)</h2>
+            </div>
 
-            {/* Navigation Tabs */}
-            <Paper sx={{ width: '100%', mb: 3 }}>
-                <Tabs 
-                    value={tabIndex} 
-                    onChange={handleTabChange} 
-                    centered
-                    indicatorColor="primary"
-                    textColor="primary"
-                >
-                    <Tab label="Categories" />
-                    <Tab label="Products" />
-                </Tabs>
-            </Paper>
-
-            {/* Entity Manager Display Section */}
-            <Box sx={{ mt: 2 }}>
-                {/* Category Management Tab */}
-                {tabIndex === 0 && (
-                    <UniformEntityManager 
-                        resource="categories" 
-                        schemaUrl="/api/schema/uniforms/category" 
-                        title="Category" 
-                    />
-                )}
-                {/* Product Management Tab */}
-                {tabIndex === 1 && (
-                    <UniformEntityManager 
-                        resource="products" 
-                        schemaUrl="/api/schema/uniforms/product" 
-                        title="Product" 
-                        selectOptions={productSelectOptions}
-                    />
-                )}
-            </Box>
-        </Box>
+            <TabStrip selected={selected} onSelect={handleSelect}>
+                <TabStripTab title="Products">
+                    <div style={{ marginTop: '20px' }}>
+                        <UniformEntityManager 
+                            resource="products"
+                            title="Product"
+                            schemaUrl="/api/schema/uniforms/product"
+                            selectOptions={{
+                                CategoryId: {
+                                    resource: 'categories',
+                                    label: 'Category',
+                                    // These will be used by our custom SelectField
+                                    options: [] 
+                                }
+                            }}
+                        />
+                    </div>
+                </TabStripTab>
+                <TabStripTab title="Categories">
+                    <div style={{ marginTop: '20px' }}>
+                        <UniformEntityManager 
+                            resource="categories"
+                            title="Category"
+                            schemaUrl="/api/schema/uniforms/category"
+                        />
+                    </div>
+                </TabStripTab>
+            </TabStrip>
+        </div>
     );
 };
-
-export default RestUniformExample;

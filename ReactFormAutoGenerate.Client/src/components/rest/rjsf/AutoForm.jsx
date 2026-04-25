@@ -1,36 +1,29 @@
 import React, { useMemo } from "react";
-import { Edit, Create } from "@refinedev/mui";
 import { useForm } from "@refinedev/core";
 import { useQueries, useQueryClient } from "@tanstack/react-query";
-import Form from "@rjsf/mui";
+import Form from "@rjsf/core";
 import validator from "@rjsf/validator-ajv8";
 import axios from "axios";
-import { Box, CircularProgress, IconButton } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Button } from "@progress/kendo-react-buttons";
+import { Loader } from "@progress/kendo-react-indicators";
+import { xIcon, saveIcon } from "@progress/kendo-svg-icons";
+import { SvgIcon } from "@progress/kendo-react-common";
+
+import { widgets } from "../../common/rjsf-kendo/Widgets";
+import { ObjectFieldTemplate } from "../../common/rjsf-kendo/ObjectFieldTemplate";
 
 const api = axios.create({ baseURL: "/api" });
 
-/**
- * Helper utility to retrieve a value from an object using a case-insensitive key.
- * Essential for bridging .NET (PascalCase) and JS (camelCase) naming differences.
- */
 const getVal = (obj, key) => {
   if (!obj) return "";
   const foundKey = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
   return foundKey ? obj[foundKey] : "";
 };
 
-/**
- * AutoForm Component
- * Dynamically generates a Create or Edit form based on a JSON Schema.
- * It handles automatic data binding, type conversion, and relational dropdowns.
- */
 const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], record = null }) => {
   const formRef = React.useRef(null);
   const queryClient = useQueryClient();
 
-  // --- 1. Relational Data Loading ---
-  // Fetches data for fields that should be rendered as dropdowns (e.g., CategoryId).
   const relQueriesResults = useQueries({
     queries: relations.map(rel => ({
       queryKey: [rel.resource],
@@ -44,7 +37,6 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
 
   const isRelLoading = relQueriesResults.some(res => res.isLoading);
   
-  // Aggregate relational options into a lookup object
   const relOptions = useMemo(() => {
     const options = {};
     relQueriesResults.forEach((res, index) => {
@@ -54,14 +46,11 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
     return options;
   }, [relQueriesResults, relations]);
 
-  // --- 2. Refine useForm Hook ---
-  // Manages the mutation (POST/PATCH) and initial data fetching from the API.
-  const { onFinish, queryResult, saveButtonProps, formLoading } = useForm({
+  const { onFinish, queryResult, formLoading } = useForm({
     action: action,
     resource: resource,
     id: id,
     onMutationSuccess: () => {
-      // Refresh the list view by invalidating the React Query cache
       queryClient.invalidateQueries({ queryKey: [resource] });
       onCancel();
     },
@@ -69,8 +58,6 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
 
   const initialData = queryResult?.data?.data;
 
-  // --- 3. Schema Transformation ---
-  // Dynamically cleans the schema and injects relational options.
   const cleanedSchema = useMemo(() => {
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
@@ -81,9 +68,6 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
-
-        // Dynamically remove EF navigation properties or complex objects
-        // We only want to keep primitive types or fields explicitly defined in relations
         const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
         const isComplexType = prop.type === "object" || prop.type === "array" || 
                              (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
@@ -92,10 +76,7 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
           delete s.properties[key];
           return;
         }
-
         if (!prop.title) prop.title = key.charAt(0).toUpperCase() + key.slice(1);
-        
-        // Convert to dropdown if relation exists
         if (relOptions[lowerKey]) {
           prop.oneOf = relOptions[lowerKey];
           if (Array.isArray(prop.type)) prop.type = prop.type.find(t => t !== "null") || "integer";
@@ -107,8 +88,6 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
     return s;
   }, [schema, relOptions, action, relations]);
 
-  // --- 4. Data Mapping (formData) ---
-  // Maps raw server data to the form fields, ensuring correct types and defaults.
   const finalData = useMemo(() => {
     const data = {};
     if (cleanedSchema?.properties) {
@@ -133,30 +112,58 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
   }, [cleanedSchema, record, initialData, id, action]);
 
   if (formLoading || !cleanedSchema || isRelLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>;
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+        <Loader size="medium" type="pulsing" />
+      </div>
+    );
   }
 
-  // --- 5. UI Schema Configuration ---
-  const FormWrapper = action === "create" ? Create : Edit;
-  const uiSchema = { "ui:submitButtonOptions": { "norender": true } };
-  
+  const uiSchema = { 
+    "ui:submitButtonOptions": { "norender": true }
+  };
   Object.keys(cleanedSchema.properties || {}).forEach(key => {
-    if (key.toLowerCase() === "id" && action === "edit") uiSchema[key] = { "ui:readonly": true };
-    if (relOptions[key.toLowerCase()]) uiSchema[key] = { "ui:widget": "select" };
+    const isIdField = key.toLowerCase() === "id";
+    
+    if (isIdField && action === "edit") {
+      uiSchema[key] = { 
+        "ui:readonly": true,
+        "ui:disabled": true
+      };
+    }
+    
+    // 커스텀 위젯에서 라벨을 그리므로 기본 라벨 출력 비활성화
+    if (!uiSchema[key]) uiSchema[key] = {};
+    uiSchema[key]["ui:label"] = false;
   });
 
   return (
-    <Box sx={{ mb: 4 }}>
-      <FormWrapper 
-        saveButtonProps={{ ...saveButtonProps, onClick: (e) => { e.preventDefault(); formRef.current?.submit(); } }} 
-        title={action === "create" ? `Create New ${resource}` : `Edit ${resource} #${id}`}
-        headerButtons={<IconButton onClick={onCancel}><CloseIcon /></IconButton>}
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+        <h4 style={{ margin: 0 }}>{action === "create" ? `Create New ${resource}` : `Edit ${resource} #${id}`}</h4>
+        <Button fillMode="flat" onClick={onCancel}>
+          <SvgIcon icon={xIcon} />
+        </Button>
+      </div>
+
+      <Form 
+        ref={formRef} 
+        schema={cleanedSchema} 
+        uiSchema={uiSchema} 
+        validator={validator} 
+        formData={finalData}
+        widgets={widgets}
+        templates={{ ObjectFieldTemplate }}
+        onSubmit={({ formData }) => onFinish(formData)}
       >
-        <Form ref={formRef} schema={cleanedSchema} uiSchema={uiSchema} validator={validator} formData={finalData}
-          onSubmit={({ formData }) => onFinish(formData)} children={<></>} 
-        />
-      </FormWrapper>
-    </Box>
+        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+          <Button fillMode="outline" onClick={onCancel}>Cancel</Button>
+          <Button themeColor="primary" onClick={() => formRef.current?.submit()}>
+            <SvgIcon icon={saveIcon} /> Save
+          </Button>
+        </div>
+      </Form>
+    </div>
   );
 };
 
