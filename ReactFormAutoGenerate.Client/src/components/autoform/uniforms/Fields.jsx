@@ -31,7 +31,9 @@ const labelStyle = {
 };
 
 const inputContainerStyle = { 
-  flexGrow: 1 
+  flexGrow: 1,
+  width: '1px',
+  minWidth: 0
 };
 
 /**
