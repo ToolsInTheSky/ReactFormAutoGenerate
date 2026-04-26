@@ -7,7 +7,7 @@
  */
 
 import React from "react";
-import { Input, Checkbox, NumericTextBox, TextArea } from "@progress/kendo-react-inputs";
+import { Input, Checkbox, NumericTextBox, TextArea, Switch } from "@progress/kendo-react-inputs";
 import { DropDownList } from "@progress/kendo-react-dropdowns";
 import { Label } from "@progress/kendo-react-labels";
 import { DateTimePicker } from "@progress/kendo-react-dateinputs";
@@ -157,17 +157,20 @@ export const CheckboxWidget = (props) => {
 
   return (
     <div style={fieldStyle}>
-      <div style={labelStyle}></div>
+      <div style={labelStyle}>
+        <Label editorId={id}>
+          {label}{required && <span className="k-required">*</span>}
+        </Label>
+      </div>
       <div style={{ ...inputContainerStyle, display: 'flex', alignItems: 'center' }}>
-        <Checkbox
+        <Switch
           id={id}
           checked={!!value}
           disabled={disabled || readonly}
           onChange={(e) => onChange(e.value)}
+          onLabel="Yes"
+          offLabel="No"
         />
-        <Label editorId={id} style={{ marginLeft: '10px' }}>
-          {label}{required && <span className="k-required">*</span>}
-        </Label>
       </div>
     </div>
   );

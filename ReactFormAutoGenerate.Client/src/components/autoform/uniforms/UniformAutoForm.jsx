@@ -17,7 +17,7 @@ import { SvgIcon } from "@progress/kendo-react-common";
 import { xIcon, trashIcon } from "@progress/kendo-svg-icons";
 import { Loader } from "@progress/kendo-react-indicators";
 
-import { TextField, NumberField, SelectField, BoolField, SubmitField, ErrorsField } from './Fields';
+import { TextField, NumberField, SelectField, BoolField, DateField, SubmitField, ErrorsField } from './Fields';
 
 const ajv = new Ajv({ allErrors: true, useDefaults: true, strict: false });
 addFormats(ajv);
@@ -268,6 +268,7 @@ const UniformAutoForm = ({
                         return (
                             <div key={name} className="form-grid-item">
                                 {prop.options ? <SelectField key={name} {...fieldProps} options={prop.options} /> :
+                                 (prop.format === 'date-time') ? <DateField key={name} {...fieldProps} /> :
                                  (prop.type === 'integer' || prop.type === 'number') ? <NumberField key={name} {...fieldProps} /> :
                                  prop.type === 'boolean' ? <BoolField key={name} {...fieldProps} /> :
                                  <TextField key={name} {...fieldProps} />}

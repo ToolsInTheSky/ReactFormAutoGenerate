@@ -16,6 +16,9 @@ public class InventoryItem
 
     public DateTime UpdateDate { get; set; } = DateTime.UtcNow;
 
+    [Column(TypeName = "text")]
+    public string? Note { get; set; }
+
     [ForeignKey("ProductId")]
     [System.Text.Json.Serialization.JsonIgnore]
     public Product? Product { get; set; }

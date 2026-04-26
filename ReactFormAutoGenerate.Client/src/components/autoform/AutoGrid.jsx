@@ -35,9 +35,14 @@ const getVal = (obj, key) => {
  * 2. Lookup resolution (ID -> Name)
  */
 const AutoDataCell = (props) => {
-  const { dataItem, field, lookups, originalCol, isDate } = props;
+  const { dataItem, field, lookups, originalCol, isDate, isBoolean } = props;
   const val = dataItem[field] ?? getVal(dataItem, originalCol);
   
+  // section: Boolean Formatting
+  if (isBoolean) {
+    return <td {...props.tdProps}>{val ? "Yes" : "No"}</td>;
+  }
+
   // section: Date Formatting
   if (isDate && val) {
     const date = new Date(val);
@@ -129,6 +134,7 @@ const AutoGrid = ({
           const dataKey = col.charAt(0).toLowerCase() + col.slice(1);
           const relationResource = prop["x-relation"];
           const isDate = col.toLowerCase().includes("date") || prop.format === "date-time";
+          const isBoolean = prop.type === "boolean";
           const title = relationResource ? pluralize.singular(relationResource).toUpperCase() : (prop.title || col).toUpperCase();
 
           return (
@@ -136,7 +142,7 @@ const AutoGrid = ({
               key={col} 
               field={dataKey} 
               title={title} 
-              cells={{ data: (cp) => <AutoDataCell {...cp} lookups={lookups} originalCol={col} isDate={isDate} /> }}
+              cells={{ data: (cp) => <AutoDataCell {...cp} lookups={lookups} originalCol={col} isDate={isDate} isBoolean={isBoolean} /> }}
             />
           );
         })}

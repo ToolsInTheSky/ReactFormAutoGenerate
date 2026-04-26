@@ -25,22 +25,23 @@ public class Mutation
     }
 
     public async Task<Product> CreateProductAsync(
-        string name, decimal price, int categoryId, AppDbContext context)
+        string name, decimal price, int categoryId, string? description, AppDbContext context)
     {
-        var product = new Product { Name = name, Price = price, CategoryId = categoryId };
+        var product = new Product { Name = name, Price = price, CategoryId = categoryId, Description = description };
         context.Products.Add(product);
         await context.SaveChangesAsync();
         return product;
     }
 
     public async Task<Product> UpdateProductAsync(
-        int id, string name, decimal price, int categoryId, AppDbContext context)
+        int id, string name, decimal price, int categoryId, string? description, AppDbContext context)
     {
         var product = await context.Products.FindAsync(id);
         if (product == null) throw new Exception("Product not found");
         product.Name = name;
         product.Price = price;
         product.CategoryId = categoryId;
+        product.Description = description;
         await context.SaveChangesAsync();
         return product;
     }
@@ -64,21 +65,22 @@ public class Mutation
     }
 
     public async Task<InventoryItem> CreateInventoryItemAsync(
-        int productId, int stockQuantity, AppDbContext context)
+        int productId, int stockQuantity, string? note, AppDbContext context)
     {
-        var item = new InventoryItem { ProductId = productId, StockQuantity = stockQuantity, UpdateDate = DateTime.UtcNow };
+        var item = new InventoryItem { ProductId = productId, StockQuantity = stockQuantity, Note = note, UpdateDate = DateTime.UtcNow };
         context.InventoryItems.Add(item);
         await context.SaveChangesAsync();
         return item;
     }
 
     public async Task<InventoryItem> UpdateInventoryItemAsync(
-        int id, int productId, int stockQuantity, AppDbContext context)
+        int id, int productId, int stockQuantity, string? note, AppDbContext context)
     {
         var item = await context.InventoryItems.FindAsync(id);
         if (item == null) throw new Exception("Inventory item not found");
         item.ProductId = productId;
         item.StockQuantity = stockQuantity;
+        item.Note = note;
         item.UpdateDate = DateTime.UtcNow;
         await context.SaveChangesAsync();
         return item;

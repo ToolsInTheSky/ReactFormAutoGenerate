@@ -7,10 +7,11 @@
 
 import React from 'react';
 import { connectField } from 'uniforms';
-import { Input, Checkbox, NumericTextBox, TextArea } from '@progress/kendo-react-inputs';
+import { Input, Checkbox, NumericTextBox, TextArea, Switch } from '@progress/kendo-react-inputs';
 import { DropDownList } from '@progress/kendo-react-dropdowns';
 import { Label } from '@progress/kendo-react-labels';
 import { Button } from '@progress/kendo-react-buttons';
+import { DateTimePicker } from '@progress/kendo-react-dateinputs';
 
 /**
  * Common layout styles for form rows.
@@ -155,18 +156,41 @@ const SelectInput = ({ id, label, value, onChange, disabled, required, error, sh
  */
 const BoolInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
   <div style={fieldStyle}>
-    <div style={labelStyle}></div>
+    <Label editorId={id} style={labelStyle}>
+      {label}{required && <span className="k-required">*</span>}
+    </Label>
     <div style={{ ...inputContainerStyle, display: 'flex', alignItems: 'center' }}>
-      <Checkbox
+      <Switch
         id={id}
         checked={!!value}
         onChange={e => onChange(e.value)}
         disabled={disabled}
+        onLabel="Yes"
+        offLabel="No"
       />
-      <Label editorId={id} style={{ marginLeft: '10px' }}>
-        {label}{required && <span className="k-required">*</span>}
-      </Label>
       {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px', marginLeft: '10px' }}>{error.message}</div>}
+    </div>
+  </div>
+);
+
+/**
+ * DateInput Component
+ * Integration with Kendo DateTimePicker.
+ */
+const DateInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
+  <div style={fieldStyle}>
+    <Label editorId={id} style={labelStyle}>
+      {label}{required && <span className="k-required">*</span>}
+    </Label>
+    <div style={inputContainerStyle}>
+      <DateTimePicker
+        id={id}
+        value={value ? new Date(value) : null}
+        onChange={e => onChange(e.value?.toISOString())}
+        disabled={disabled}
+        style={{ width: '100%' }}
+      />
+      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
     </div>
   </div>
 );
@@ -179,6 +203,7 @@ export const TextField = connectField(TextInput);
 export const NumberField = connectField(NumberInput);
 export const SelectField = connectField(SelectInput);
 export const BoolField = connectField(BoolInput);
+export const DateField = connectField(DateInput);
 
 /**
  * SubmitField Component

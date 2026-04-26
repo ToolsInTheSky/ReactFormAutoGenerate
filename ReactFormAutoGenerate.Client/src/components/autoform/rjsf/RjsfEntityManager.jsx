@@ -85,7 +85,18 @@ const RjsfEntityManager = ({ protocol = "rest", resource, entityName, schemaKey 
     const fields = Object.keys(schema.properties)
         .filter(key => {
             const prop = schema.properties[key];
-            return !prop["x-identity"] && (prop.type !== "object" && prop.type !== "array" || !!prop["x-relation"]);
+            // Exclude ID
+            if (prop["x-identity"]) return false;
+
+            // Identify complex types ($ref, object, array, oneOf, anyOf)
+            const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
+                             prop.oneOf || prop.anyOf ||
+                             (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
+            
+            // Only allow if it's a simple type OR a complex type with explicit relation mapping
+            if (isComplex && !prop["x-relation"]) return false;
+            
+            return true;
         })
         .map(key => toCamelCase(key))
         .join("\n");
