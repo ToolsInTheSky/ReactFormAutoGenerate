@@ -1,7 +1,14 @@
+/**
+ * @file App.jsx
+ * @description Main application component that configures global providers, routing, and layouts.
+ * It integrates Refine for data management, KendoReact for UI components/notifications, 
+ * and React Router for navigation between different schema-driven UI examples.
+ */
+
 import { useState, useCallback } from 'react';
 import './App.css';
 import '@progress/kendo-theme-default/dist/all.css';
-import SchemaFetcher from './components/common/SchemaFetcher';
+import SchemaFetcher from './components/autoform/SchemaFetcher';
 import { Refine } from "@refinedev/core";
 import dataProvider from "@refinedev/simple-rest";
 import gqlDataProvider from "@refinedev/nestjs-query";
@@ -24,11 +31,17 @@ const API_URL = window.location.origin + "/api";
 const GQL_URL = window.location.origin + "/graphql";
 
 /**
- * Custom KendoReact Notification Provider for Refine
+ * Custom Hook: useKendoNotification
+ * @description Manages application-level notifications using KendoReact's Notification components.
+ * Returns props for the NotificationGroup and the provider object for Refine integration.
  */
 const useKendoNotification = () => {
     const [notifications, setNotifications] = useState([]);
 
+    /**
+     * Opens a new notification.
+     * !!! IMPORTANT: Used by Refine to show success/error messages after mutations.
+     */
     const open = useCallback(({ message, type, key }) => {
         const id = key || Math.random().toString();
         setNotifications((prev) => [...prev, { id, message, type: type === "error" ? "error" : "success" }]);
@@ -48,7 +61,11 @@ const useKendoNotification = () => {
 };
 
 /**
- * Refine Context Wrapper
+ * RefineContextWrapper Component
+ * @description Wraps children with Refine context, configuring multiple data providers (REST & GraphQL).
+ * !!! IMPORTANT: Dual Data Provider Setup !!!
+ * - 'default': standard REST API.
+ * - 'graphql': HotChocolate GraphQL API.
  */
 const RefineContextWrapper = ({ children, notificationProvider }) => {
     const restProvider = dataProvider(API_URL);
@@ -78,6 +95,7 @@ const RefineContextWrapper = ({ children, notificationProvider }) => {
 
 /**
  * HomePage Component
+ * @description The landing page showcasing 4 different ways to generate UI from schemas.
  */
 const HomePage = () => {
     const [showSchemas, setShowSchemas] = useState(false);
@@ -92,6 +110,7 @@ const HomePage = () => {
                 using RJSF and Uniforms (KendoReact Edition).
             </p>
 
+            {/* Section: Schema Exploration */}
             <div style={{ marginBottom: '40px' }}>
                 <Button 
                     fillMode="outline" 
@@ -110,6 +129,7 @@ const HomePage = () => {
                 </Fade>
             </div>
 
+            {/* Section: Feature Navigation Cards */}
             <h2 style={{ borderBottom: '1px solid #eee', paddingBottom: '10px', margin: '40px 0 20px' }}>RESTful API Examples</h2>
             <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap' }}>
                 <Card style={{ width: '320px' }}>
@@ -157,6 +177,10 @@ const HomePage = () => {
     );
 };
 
+/**
+ * App Component
+ * @description Root component that initializes routing and the notification UI layer.
+ */
 function App() {
     const { notificationProps, notificationProvider } = useKendoNotification();
 
@@ -207,6 +231,7 @@ function App() {
                     } />
                 </Routes>
                 
+                {/* Global Notification Group Rendering */}
                 <NotificationGroup style={{ right: 20, bottom: 20, alignItems: 'flex-start', flexWrap: 'wrap-reverse' }}>
                     {notificationProps.notifications.map((n) => (
                         <Fade key={n.id}>

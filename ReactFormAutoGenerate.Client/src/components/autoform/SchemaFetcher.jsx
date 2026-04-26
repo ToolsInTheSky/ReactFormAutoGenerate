@@ -1,15 +1,28 @@
+/**
+ * @file SchemaFetcher.jsx
+ * @description A diagnostic utility component that fetches and displays 
+ * all raw JSON Schemas available from the backend. 
+ * This is useful for developers to verify the schema structure exported by the .NET backend.
+ */
+
 import { useState, useEffect } from 'react';
 
 /**
  * SchemaFetcher Component
- * Fetches and displays all available backend schemas (KendoReact Edition).
+ * @description Retrieves a master list of all schemas from '/api/schema/all' 
+ * and renders them in a readable, pre-formatted JSON structure.
  */
 function SchemaFetcher() {
     const [schemas, setSchemas] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // section: Data Fetching
     useEffect(() => {
+        /**
+         * Fetches the consolidated schemas object.
+         * !!! IMPORTANT: The backend endpoint must exist at /api/schema/all.
+         */
         const fetchSchemas = async () => {
             try {
                 const response = await fetch('/api/schema/all');
@@ -31,8 +44,12 @@ function SchemaFetcher() {
     if (loading) return <div>Loading schemas...</div>;
     if (error) return <div style={{ color: 'red' }}>Error fetching schemas: {error}</div>;
 
+    /**
+     * Recursive function to render nested schema categories.
+     */
     const renderSchemas = (data, depth = 0) => {
         return Object.entries(data).map(([key, value]) => {
+            // If the value is a nested category (not a final schema object)
             if (value && typeof value === 'object' && !value.type && !value.properties) {
                 return (
                     <div key={key} style={{ marginTop: depth === 0 ? '40px' : '20px', marginBottom: '20px' }}>
@@ -45,6 +62,7 @@ function SchemaFetcher() {
                     </div>
                 );
             } else {
+                // section: Final Schema Display
                 return (
                     <div key={key} style={{ marginBottom: '30px' }}>
                         <h4 style={{ fontWeight: 'bold' }}>{key}</h4>
@@ -72,6 +90,8 @@ function SchemaFetcher() {
                 Below are the raw JSON schemas exported from the .NET 9 backend. 
                 Note how they are slightly adjusted for different frontend libraries.
             </p>
+            
+            {/* !!! IMPORTANT: Dynamic Schema Rendering !!! */}
             {schemas && renderSchemas(schemas)}
         </div>
     );

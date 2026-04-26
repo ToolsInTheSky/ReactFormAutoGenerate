@@ -40,6 +40,7 @@ public class InventoryItemsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [HttpPatch("{id}")]
     public async Task<IActionResult> PutInventoryItem(int id, InventoryItem item)
     {
         if (id != item.Id) return BadRequest();

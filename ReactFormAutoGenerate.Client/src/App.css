@@ -46,29 +46,68 @@
 }
 
 /* Kendo Grid Row Pointer */
-.k-grid tr.k-master-row {
-  cursor: pointer;
-}
+.k-grid tr.k-master-row,
 .k-grid tr.k-table-row {
   cursor: pointer;
 }
 
 /* Kendo Grid Header Styling */
-.k-grid-header {
-  background-color: #444 !important;
-}
-
+.k-grid-header,
 .k-grid-header .k-header {
   background-color: #444 !important;
   color: white !important;
-  font-weight: bold !important;
 }
 
 .k-grid-header .k-column-title {
   font-weight: bold !important;
 }
 
-/* Responsive Form Grid */
+/* Kendo UI Popup Z-Index Fix */
+.k-animation-container,
+.k-popup,
+.k-calendar {
+  z-index: 10001 !important;
+}
+
+/* --- Kendo DropDownList Ellipsis Fix (Definitive) --- */
+
+/* 1. 컴포넌트 자체의 너비를 부모에 맞춤 */
+.k-dropdownlist, 
+.k-dropdown {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: fixed !important; /* 내부 확장을 막음 */
+}
+
+/* 2. 내부 텍스트 컨테이너: 가장 핵심적인 부분 */
+.k-dropdownlist .k-input-inner,
+.k-dropdown .k-input-inner {
+  display: flex !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  min-width: 0 !important; /* flex 자식이 줄어들 수 있게 함 */
+  flex: 1 1 0% !important;
+}
+
+/* 3. 실제 텍스트가 적히는 span 요소 */
+.k-dropdownlist .k-input-value-text,
+.k-dropdown .k-input-value-text {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  width: 100% !important;
+  display: block !important;
+}
+
+/* 4. 드롭다운 리스트 아이템 */
+.k-list-item-text {
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+}
+
+/* --- Form Layout --- */
 .form-grid-container {
   display: flex;
   flex-wrap: wrap;
@@ -77,10 +116,11 @@
 }
 
 .form-grid-item {
-  width: 50%;
+  width: 100%; /* 한 줄에 하나씩 */
   padding-left: 10px;
   padding-right: 10px;
   box-sizing: border-box;
+  min-width: 0; /* 중요: 내부의 긴 요소가 부모를 키우지 못하게 함 */
 }
 
 @media (max-width: 768px) {
@@ -88,6 +128,3 @@
     width: 100%;
   }
 }
-
-
-

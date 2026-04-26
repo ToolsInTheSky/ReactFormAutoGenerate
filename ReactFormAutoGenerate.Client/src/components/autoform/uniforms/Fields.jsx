@@ -1,10 +1,20 @@
+/**
+ * @file Fields.jsx
+ * @description Collection of custom KendoReact fields for Uniforms.
+ * This file defines the visual mapping between Uniforms logical fields 
+ * and KendoReact UI components, ensuring a professional look and feel.
+ */
+
 import React from 'react';
 import { connectField } from 'uniforms';
-import { Input, Checkbox, NumericTextBox } from '@progress/kendo-react-inputs';
+import { Input, Checkbox, NumericTextBox, TextArea } from '@progress/kendo-react-inputs';
 import { DropDownList } from '@progress/kendo-react-dropdowns';
 import { Label } from '@progress/kendo-react-labels';
 import { Button } from '@progress/kendo-react-buttons';
 
+/**
+ * Common layout styles for form rows.
+ */
 const fieldStyle = { 
   display: 'flex', 
   alignItems: 'center', 
@@ -23,25 +33,50 @@ const inputContainerStyle = {
   flexGrow: 1 
 };
 
-const TextInput = ({ id, label, value, onChange, disabled, required, error, showInlineError, maxLength }) => (
-  <div style={fieldStyle}>
-    <Label editorId={id} style={labelStyle}>
-      {label}{required && <span className="k-required">*</span>}
-    </Label>
-    <div style={inputContainerStyle}>
-      <Input
-        id={id}
-        value={value || ""}
-        onChange={e => onChange(e.value)}
-        disabled={disabled}
-        style={{ width: '100%' }}
-        maxLength={maxLength} // 스키마의 maxLength 전달
-      />
-      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
-    </div>
-  </div>
-);
+/**
+ * TextInput Component
+ * !!! IMPORTANT: Dynamic rendering between Input and TextArea based on name/length.
+ */
+const TextInput = ({ id, label, value, onChange, disabled, required, error, showInlineError, maxLength, name }) => {
+  const isDescription = name.toLowerCase().includes("description") || (maxLength && maxLength >= 500);
 
+  return (
+    <div style={{ ...fieldStyle, alignItems: isDescription ? 'flex-start' : 'center' }}>
+      <Label editorId={id} style={isDescription ? { ...labelStyle, marginTop: '8px' } : labelStyle}>
+        {label}{required && <span className="k-required">*</span>}
+      </Label>
+      <div style={inputContainerStyle}>
+        {isDescription ? (
+          <TextArea
+            id={id}
+            value={value || ""}
+            onChange={e => onChange(e.value)}
+            disabled={disabled}
+            autoSize={true}
+            rows={3}
+            style={{ width: '100%' }}
+            maxLength={maxLength}
+          />
+        ) : (
+          <Input
+            id={id}
+            value={value || ""}
+            onChange={e => onChange(e.value)}
+            disabled={disabled}
+            style={{ width: '100%' }}
+            maxLength={maxLength}
+          />
+        )}
+        {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * NumberInput Component
+ * Integration with Kendo NumericTextBox.
+ */
 const NumberInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
   <div style={fieldStyle}>
     <Label editorId={id} style={labelStyle}>
@@ -60,6 +95,11 @@ const NumberInput = ({ id, label, value, onChange, disabled, required, error, sh
   </div>
 );
 
+/**
+ * SelectInput Component
+ * Integration with Kendo DropDownList.
+ * !!! IMPORTANT: Implements ellipsis rendering for long lookup items.
+ */
 const SelectInput = ({ id, label, value, onChange, disabled, required, error, showInlineError, options }) => {
   const data = (options || []).map(opt => ({
     text: opt.label || opt.title || String(opt.const || opt.value || ""),
@@ -67,6 +107,24 @@ const SelectInput = ({ id, label, value, onChange, disabled, required, error, sh
   }));
   
   const selectedValue = data.find(opt => opt.value === value);
+
+  const itemRender = (li, itemProps) => {
+    const itemChildren = (
+      <span 
+        title={itemProps.dataItem.text} 
+        style={{ 
+          whiteSpace: 'nowrap', 
+          overflow: 'hidden', 
+          textOverflow: 'ellipsis', 
+          display: 'block',
+          width: '100%'
+        }}
+      >
+        {itemProps.dataItem.text}
+      </span>
+    );
+    return React.cloneElement(li, li.props, itemChildren);
+  };
   
   return (
     <div style={fieldStyle}>
@@ -83,6 +141,7 @@ const SelectInput = ({ id, label, value, onChange, disabled, required, error, sh
           onChange={e => onChange(e.value.value)}
           disabled={disabled}
           style={{ width: '100%' }}
+          itemRender={itemRender}
         />
         {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
       </div>
@@ -90,6 +149,10 @@ const SelectInput = ({ id, label, value, onChange, disabled, required, error, sh
   );
 };
 
+/**
+ * BoolInput Component
+ * Integration with Kendo Checkbox.
+ */
 const BoolInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
   <div style={fieldStyle}>
     <div style={labelStyle}></div>
@@ -108,16 +171,28 @@ const BoolInput = ({ id, label, value, onChange, disabled, required, error, show
   </div>
 );
 
+/**
+ * !!! IMPORTANT: Uniforms Field Mapping !!!
+ * Uses connectField to inject Uniforms logic into the Kendo components.
+ */
 export const TextField = connectField(TextInput);
 export const NumberField = connectField(NumberInput);
 export const SelectField = connectField(SelectInput);
 export const BoolField = connectField(BoolInput);
 
+/**
+ * SubmitField Component
+ * A stylized Kendo Button that triggers form submission.
+ */
 export const SubmitField = ({ value, ...props }) => (
   <Button themeColor="primary" type="submit" {...props}>
     {value || 'Submit'}
   </Button>
 );
 
+/**
+ * ErrorsField Component
+ * Displays schema validation summary at the bottom of the form.
+ */
 export const ErrorsField = ({ error, children }) => 
-  error ? <div style={{ color: 'red', marginLeft: '170px', marginBottom: '10px', fontSize: '14px' }}>{children || error.message}</div> : null;
+  error ? <div style={{ color: 'red', marginLeft: '110px', marginBottom: '10px', fontSize: '14px' }}>{children || error.message}</div> : null;
