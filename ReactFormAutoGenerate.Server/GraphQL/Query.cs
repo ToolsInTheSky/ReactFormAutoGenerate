@@ -1,11 +1,10 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.Json.Schema;
 using HotChocolate;
 using HotChocolate.Data;
 using HotChocolate.Types;
+using NJsonSchema;
 using ReactFormAutoGenerate.Server.Data;
 using ReactFormAutoGenerate.Server.Entities;
+using ReactFormAutoGenerate.Server.Controllers;
 
 namespace ReactFormAutoGenerate.Server.GraphQL;
 
@@ -25,9 +24,16 @@ public class Query
     public IQueryable<Product> GetProducts(AppDbContext context) =>
         context.Products;
 
+    [UseOffsetPaging(IncludeTotalCount = true)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<InventoryItem> GetInventoryItems(AppDbContext context) =>
+        context.InventoryItems;
+
     /// <summary>
-    /// Returns the JSON Schema for a given entity type.
-    /// protocol: "rjsf" or "uniforms"
+    /// Returns the JSON Schema for a given entity type using NJsonSchema.
+    /// protocol parameter is now ignored as we use a unified schema.
     /// </summary>
     public string GetJsonSchema(string entityName, string protocol)
     {
@@ -37,42 +43,9 @@ public class Query
 
         if (type == null) return "{}";
 
-        var options = new JsonSerializerOptions(JsonSerializerOptions.Default)
-        {
-            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
-        };
-
-        var schemaNode = options.GetJsonSchemaAsNode(type);
-
-        if (string.Equals(protocol, "uniforms", StringComparison.OrdinalIgnoreCase))
-        {
-            var obj = schemaNode.AsObject();
-            CleanSchemaForUniforms(obj);
-            return obj.ToJsonString();
-        }
-
-        return schemaNode.ToJsonString();
-    }
-
-    private void CleanSchemaForUniforms(JsonObject schema)
-    {
-        if (schema.TryGetPropertyValue("type", out var typeNode))
-            schema["type"] = "object";
-
-        if (schema.TryGetPropertyValue("properties", out var propertiesNode) && propertiesNode is JsonObject properties)
-        {
-            foreach (var property in properties)
-            {
-                var propObj = property.Value?.AsObject();
-                if (propObj != null && propObj.TryGetPropertyValue("type", out var pType))
-                {
-                    if (pType is JsonArray pArray)
-                    {
-                        var first = pArray.FirstOrDefault(t => t?.GetValue<string>() != "null");
-                        if (first != null) propObj["type"] = first.GetValue<string>();
-                    }
-                }
-            }
-        }
+        var schema = JsonSchema.FromType(type, SchemaController.Settings);
+        SchemaController.ProcessCustomMetadata(schema, type);
+        
+        return schema.ToJson();
     }
 }

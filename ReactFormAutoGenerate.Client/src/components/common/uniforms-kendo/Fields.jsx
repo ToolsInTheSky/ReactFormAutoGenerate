@@ -12,10 +12,10 @@ const fieldStyle = {
 };
 
 const labelStyle = { 
-  width: '150px', 
+  width: '100px', 
   flexShrink: 0, 
-  textAlign: 'right', 
-  marginRight: '20px', 
+  textAlign: 'left', 
+  marginRight: '10px', 
   fontWeight: 'bold' 
 };
 
@@ -23,7 +23,7 @@ const inputContainerStyle = {
   flexGrow: 1 
 };
 
-const TextInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
+const TextInput = ({ id, label, value, onChange, disabled, required, error, showInlineError, maxLength }) => (
   <div style={fieldStyle}>
     <Label editorId={id} style={labelStyle}>
       {label}{required && <span className="k-required">*</span>}
@@ -35,6 +35,7 @@ const TextInput = ({ id, label, value, onChange, disabled, required, error, show
         onChange={e => onChange(e.value)}
         disabled={disabled}
         style={{ width: '100%' }}
+        maxLength={maxLength} // 스키마의 maxLength 전달
       />
       {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
     </div>

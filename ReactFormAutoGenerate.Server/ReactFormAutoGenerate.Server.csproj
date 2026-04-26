@@ -14,6 +14,7 @@
     <PackageReference Include="HotChocolate.Data" Version="15.1.15" />
     <PackageReference Include="HotChocolate.Data.EntityFramework" Version="15.1.15" />
     <PackageReference Include="HotChocolate.Types.OffsetPagination" Version="15.1.15" />
+    <PackageReference Include="Humanizer.Core" Version="3.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
       <Version>9.*-*</Version>
     </PackageReference>
@@ -26,6 +27,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="NJsonSchema" Version="11.6.1" />
+    <PackageReference Include="NJsonSchema.NewtonsoftJson" Version="11.6.1" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>

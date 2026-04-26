@@ -1,7 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Text.Json.Schema;
+using NJsonSchema;
+using NJsonSchema.Generation;
+using NJsonSchema.NewtonsoftJson.Generation;
+using System.Reflection;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Humanizer;
+using Newtonsoft.Json.Linq;
 using ReactFormAutoGenerate.Server.Entities;
 
 namespace ReactFormAutoGenerate.Server.Controllers;
@@ -10,55 +15,65 @@ namespace ReactFormAutoGenerate.Server.Controllers;
 [Route("api/[controller]")]
 public class SchemaController : ControllerBase
 {
-    private readonly JsonSerializerOptions _options;
-
-    public SchemaController()
+    public static readonly NewtonsoftJsonSchemaGeneratorSettings Settings = new NewtonsoftJsonSchemaGeneratorSettings
     {
-        _options = new JsonSerializerOptions(JsonSerializerOptions.Default)
-        {
-            ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
-        };
-    }
+        DefaultReferenceTypeNullHandling = ReferenceTypeNullHandling.NotNull,
+        GenerateAbstractProperties = true,
+        SchemaType = SchemaType.JsonSchema
+    };
 
     [HttpGet("all")]
     public IActionResult GetAllSchemas()
     {
-        var entities = new[] { typeof(Category), typeof(Product) };
-        var rjsf = new Dictionary<string, JsonNode>();
-        var uniforms = new Dictionary<string, JsonNode>();
+        var entities = new[] { typeof(Category), typeof(Product), typeof(InventoryItem) };
+        var schemas = new Dictionary<string, JObject>();
 
         foreach (var type in entities)
         {
-            var schemaNode = _options.GetJsonSchemaAsNode(type);
-            rjsf[type.Name] = schemaNode;
-
-            var uniNode = schemaNode.DeepClone().AsObject();
-            CleanSchemaForUniforms(uniNode);
-            uniforms[type.Name] = uniNode;
+            var schema = JsonSchema.FromType(type, Settings);
+            ProcessCustomMetadata(schema, type);
+            schemas[type.Name] = JObject.Parse(schema.ToJson());
         }
 
-        return Ok(new { RJSF = rjsf, Uniforms = uniforms });
+        // 하위 호환성을 위해 RJSF/Uniforms 키 구조 유지 (값은 동일)
+        return Ok(new { RJSF = schemas, Uniforms = schemas });
     }
 
-    private void CleanSchemaForUniforms(JsonObject schema)
+    [HttpGet("{name}")]
+    public IActionResult GetSchema(string name)
     {
-        if (schema.TryGetPropertyValue("type", out var typeNode))
-            schema["type"] = "object";
+        var type = GetEntityType(name);
+        if (type == null) return NotFound($"Entity '{name}' not found.");
 
-        if (schema.TryGetPropertyValue("properties", out var propertiesNode) && propertiesNode is JsonObject properties)
+        var schema = JsonSchema.FromType(type, Settings);
+        ProcessCustomMetadata(schema, type);
+        
+        return Content(schema.ToJson(), "application/json");
+    }
+
+    public static void ProcessCustomMetadata(JsonSchema schema, Type type)
+    {
+        foreach (var prop in type.GetProperties())
         {
-            foreach (var property in properties)
+            if (schema.Properties != null && schema.Properties.TryGetValue(prop.Name, out var jsonProp))
             {
-                var propObj = property.Value?.AsObject();
-                if (propObj != null && propObj.TryGetPropertyValue("type", out var pType))
+                if (jsonProp.ExtensionData == null) jsonProp.ExtensionData = new Dictionary<string, object>();
+                if (prop.GetCustomAttribute<KeyAttribute>() != null) jsonProp.ExtensionData["x-identity"] = true;
+                
+                if (prop.Name.Length > 2 && prop.Name.EndsWith("Id"))
                 {
-                    if (pType is JsonArray pArray)
-                    {
-                        var first = pArray.FirstOrDefault(t => t?.GetValue<string>() != "null");
-                        if (first != null) propObj["type"] = first.GetValue<string>();
-                    }
+                    var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
+                    var entityBaseName = fkAttr?.Name ?? prop.Name.Substring(0, prop.Name.Length - 2);
+                    jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
                 }
             }
         }
+    }
+
+    private Type? GetEntityType(string name)
+    {
+        return typeof(Category).Assembly.GetTypes().FirstOrDefault(t => 
+            t.Namespace == "ReactFormAutoGenerate.Server.Entities" && 
+            string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 }

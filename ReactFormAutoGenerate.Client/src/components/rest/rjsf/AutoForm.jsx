@@ -30,7 +30,7 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
       queryFn: () => api.get(`/${rel.resource}`).then(res => res.data),
       select: (data) => (Array.isArray(data) ? data : (data.data || [])).map(item => ({
         const: item.id || item.Id || item.ID,
-        title: String(item[rel.labelField] || item.Name || item.name || item.id)
+        title: String(item.name || item.Name || item.title || item.id)
       }))
     }))
   });
@@ -62,25 +62,38 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
     if (s.properties) {
-      // ID 필드는 폼 제목에 표시되므로 스키마에서 완전히 제거 (생성/수정 모두)
+      // ID 필드는 폼 제목에 표시되므로 스키마에서 완전히 제거
       const idKey = Object.keys(s.properties).find(k => k.toLowerCase() === "id");
       if (idKey) delete s.properties[idKey];
       
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
+        
+        // 1. 관계 데이터 여부 확인
         const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
-        const isComplexType = prop.type === "object" || prop.type === "array" || 
-                             (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
+        
+        // 2. 복합 객체 판별 (NJsonSchema의 $ref 또는 anyOf 포함 객체 대응)
+        const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
+                         (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
 
-        if (isComplexType && !isRelation) {
+        // 3. 관계가 아닌 복합 객체(내비게이션 속성 등)는 제거
+        if (isComplex && !isRelation) {
           delete s.properties[key];
           return;
         }
-        if (!prop.title) prop.title = key.charAt(0).toUpperCase() + key.slice(1);
+
+        // 4. 필드 제목(Title) 보장 - 2열 레이아웃에서 라벨이 보이도록 함
+        if (!prop.title) {
+            // camelCase/PascalCase를 읽기 좋은 텍스트로 변환 (예: UpdateDate -> Update Date)
+            prop.title = key.replace(/([A-Z])/g, ' $1').trim();
+        }
+
+        // 5. 관계 데이터 옵션 바인딩
         if (relOptions[lowerKey]) {
           prop.oneOf = relOptions[lowerKey];
           if (Array.isArray(prop.type)) prop.type = prop.type.find(t => t !== "null") || "integer";
+          else if (prop.type === "null") prop.type = "integer";
         } else if (Array.isArray(prop.type)) {
           prop.type = prop.type.find(t => t !== "null") || "string";
         }
@@ -97,20 +110,15 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
         const prop = cleanedSchema.properties[key];
         const val = sourceData ? getVal(sourceData, key) : undefined;
         
-        if (key.toLowerCase() === "id") {
-          if (action === "edit") {
-            const idVal = (val !== "" && val !== undefined) ? val : id;
-            data[key] = typeof idVal === 'string' ? parseInt(idVal, 10) : Number(idVal);
-          }
-        } else if (val === "" || val === undefined || val === null) {
-          data[key] = (prop.type === "number" || prop.type === "integer") ? 0 : "";
+        if (prop.type === "number" || prop.type === "integer") {
+            data[key] = (val === "" || val === undefined || val === null) ? 0 : Number(val);
         } else {
-          data[key] = (prop.type === "number" || prop.type === "integer") ? Number(val) : val;
+            data[key] = val ?? "";
         }
       });
     }
     return data;
-  }, [cleanedSchema, record, initialData, id, action]);
+  }, [cleanedSchema, record, initialData]);
 
   if (formLoading || !cleanedSchema || isRelLoading) {
     return (
@@ -124,18 +132,10 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
     "ui:submitButtonOptions": { "norender": true }
   };
   Object.keys(cleanedSchema.properties || {}).forEach(key => {
-    const isIdField = key.toLowerCase() === "id";
-    
-    if (isIdField && action === "edit") {
-      uiSchema[key] = { 
-        "ui:readonly": true,
-        "ui:disabled": true
-      };
-    }
-    
     // 커스텀 위젯에서 라벨을 그리므로 기본 라벨 출력 비활성화
-    if (!uiSchema[key]) uiSchema[key] = {};
-    uiSchema[key]["ui:label"] = false;
+    uiSchema[key] = { 
+        "ui:label": false
+    };
   });
 
   return (
@@ -160,7 +160,7 @@ const AutoForm = ({ id, action, onCancel, schema, resource, relations = [], reco
         onSubmit={({ formData }) => onFinish(formData)}
       >
         <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <Button fillMode="outline" onClick={onCancel}>Cancel</Button>
+          <Button fillMode="outline" type="button" onClick={onCancel}>Cancel</Button>
           <Button themeColor="primary" onClick={() => formRef.current?.submit()}>
             <SvgIcon icon={saveIcon} /> Save
           </Button>

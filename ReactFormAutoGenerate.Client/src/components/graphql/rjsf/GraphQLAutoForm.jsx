@@ -22,7 +22,7 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
       queryKey: ["gql-lookup-options", rel.resource],
       queryFn: async () => {
         const qName = rel.resource.charAt(0).toLowerCase() + rel.resource.slice(1);
-        const lField = toCamelCase(rel.labelField);
+        const lField = "name";
         const query = `query { ${qName} { items { id ${lField} } } }`;
         const res = await axios.post("/graphql", { query });
         const items = res.data?.data?.[qName]?.items || [];
@@ -60,16 +60,27 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
     if (s.properties) {
-      // ID 필드는 폼 제목에 표시되므로 스키마에서 완전히 제거 (생성/수정 모두)
       const idKey = Object.keys(s.properties).find(k => k.toLowerCase() === "id");
       if (idKey) delete s.properties[idKey];
-      
+
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
         const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
-        if ((prop.type === "object" || prop.type === "array") && !isRelation) { delete s.properties[key]; return; }
-        if (!prop.title) prop.title = key.charAt(0).toUpperCase() + key.slice(1);
+        
+        // 복합 객체 제거 로직 보강
+        const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
+                         (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
+
+        if (isComplex && !isRelation) { 
+            delete s.properties[key]; 
+            return; 
+        }
+
+        if (!prop.title) {
+            prop.title = key.replace(/([A-Z])/g, ' $1').trim();
+        }
+
         if (relOptions[lowerKey]) {
           prop.oneOf = relOptions[lowerKey];
           if (Array.isArray(prop.type)) prop.type = prop.type.find(t => t !== "null") || "integer";
@@ -79,7 +90,7 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
       });
     }
     return s;
-  }, [schema, relOptions, action, relations]);
+  }, [schema, relOptions, relations]);
 
   const finalData = useMemo(() => {
     const data = {};
@@ -89,20 +100,16 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
         const prop = cleanedSchema.properties[key];
         const camelKey = toCamelCase(key);
         const val = sourceData ? (sourceData[camelKey] ?? sourceData[key]) : undefined;
-        if (key.toLowerCase() === "id") {
-          if (action === "edit") {
-            const idVal = (val !== "" && val !== undefined) ? val : id;
-            data[key] = typeof idVal === 'string' ? parseInt(idVal, 10) : Number(idVal);
-          }
-        } else if (val === "" || val === undefined || val === null) {
-          data[key] = (prop.type === "number" || prop.type === "integer") ? 0 : "";
+
+        if (prop.type === "number" || prop.type === "integer") {
+            data[key] = (val === "" || val === undefined || val === null) ? 0 : Number(val);
         } else {
-          data[key] = (prop.type === "number" || prop.type === "integer") ? Number(val) : val;
+            data[key] = val ?? "";
         }
       });
     }
     return data;
-  }, [cleanedSchema, record, initialData, id, action]);
+  }, [cleanedSchema, record, initialData]);
 
   if (formLoading || !cleanedSchema || isRelLoading) {
     return <div style={{ textAlign: 'center', padding: '20px' }}><Loader size="medium" type="pulsing" /></div>;
@@ -112,18 +119,7 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
     "ui:submitButtonOptions": { "norender": true }
   };
   Object.keys(cleanedSchema.properties || {}).forEach(key => {
-    const isIdField = key.toLowerCase() === "id";
-    
-    if (isIdField && action === "edit") {
-      uiSchema[key] = { 
-        "ui:readonly": true,
-        "ui:disabled": true
-      };
-    }
-    
-    // 커스텀 위젯에서 라벨을 그리므로 기본 라벨 출력 비활성화
-    if (!uiSchema[key]) uiSchema[key] = {};
-    uiSchema[key]["ui:label"] = false;
+    uiSchema[key] = { "ui:label": false };
   });
 
   return (
@@ -143,7 +139,7 @@ const GraphQLAutoForm = ({ id, action, onCancel, schema, entityName, relations =
         }}
       >
         <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-          <Button fillMode="outline" onClick={onCancel}>Cancel</Button>
+          <Button fillMode="outline" type="button" onClick={onCancel}>Cancel</Button>
           <Button themeColor="primary" onClick={() => formRef.current?.submit()}><SvgIcon icon={saveIcon} /> Save</Button>
         </div>
       </Form>

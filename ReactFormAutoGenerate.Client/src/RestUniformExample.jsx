@@ -12,7 +12,7 @@ export const RestUniformExample = () => {
     return (
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0 }}>REST + Refine + Uniforms (KendoReact)</h2>
+                <h2 style={{ margin: 0 }}>REST + Refine + Uniforms (Auto-Config)</h2>
             </div>
 
             <TabStrip selected={selected} onSelect={handleSelect}>
@@ -21,15 +21,7 @@ export const RestUniformExample = () => {
                         <UniformEntityManager 
                             resource="products"
                             title="Product"
-                            schemaUrl="/api/schema/uniforms/product"
-                            selectOptions={{
-                                CategoryId: {
-                                    resource: 'categories',
-                                    label: 'Category',
-                                    // These will be used by our custom SelectField
-                                    options: [] 
-                                }
-                            }}
+                            schemaUrl="/api/schema/product"
                         />
                     </div>
                 </TabStripTab>
@@ -38,7 +30,7 @@ export const RestUniformExample = () => {
                         <UniformEntityManager 
                             resource="categories"
                             title="Category"
-                            schemaUrl="/api/schema/uniforms/category"
+                            schemaUrl="/api/schema/category"
                         />
                     </div>
                 </TabStripTab>

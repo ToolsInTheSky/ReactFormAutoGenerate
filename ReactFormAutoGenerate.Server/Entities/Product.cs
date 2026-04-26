@@ -15,8 +15,13 @@ public class Product
     [Column(TypeName = "decimal(18,2)")]
     public decimal Price { get; set; }
 
+    public DateTime UpdateDate { get; set; } = DateTime.UtcNow;
+
     [Required]
     public int CategoryId { get; set; }
+
+    [MaxLength(1000)]
+    public string? Description { get; set; }
 
     [ForeignKey("CategoryId")]
     [System.Text.Json.Serialization.JsonIgnore]

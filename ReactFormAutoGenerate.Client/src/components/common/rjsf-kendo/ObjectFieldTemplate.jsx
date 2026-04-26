@@ -7,9 +7,12 @@ export const ObjectFieldTemplate = (props) => {
     <fieldset id={id} style={{ border: 'none', padding: 0, margin: 0 }}>
       {props.title && <legend style={{ display: 'none' }}>{props.title}</legend>}
       {props.description && <p>{props.description}</p>}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="form-grid-container">
         {props.properties.map((element) => (
-          <div key={element.name} className="property-wrapper">
+          <div 
+            key={element.name} 
+            className="form-grid-item"
+          >
             {element.content}
           </div>
         ))}

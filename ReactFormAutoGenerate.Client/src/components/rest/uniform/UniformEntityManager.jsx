@@ -31,19 +31,12 @@ const UniformLookupDataCell = (props) => {
     const { dataItem, field, resolvedSelectOptions, originalCol } = props;
     const val = dataItem[field] ?? getVal(dataItem, originalCol);
     
-    const opt = resolvedSelectOptions[originalCol] || 
-                resolvedSelectOptions[originalCol.toLowerCase()] || 
-                resolvedSelectOptions["categoryid"];
-    
+    // 하드코딩 제거: 스키마 컬럼명으로만 검색
+    const opt = resolvedSelectOptions[originalCol] || resolvedSelectOptions[originalCol.toLowerCase()];
     const foundOpt = opt?.options?.find(o => String(o.value) === String(val));
     const displayVal = foundOpt ? foundOpt.label : val;
     const resultText = (displayVal === "null" || displayVal === "undefined") ? "" : String(displayVal ?? "");
-
-    return (
-        <td {...props.tdProps}>
-            {resultText}
-        </td>
-    );
+    return <td {...props.tdProps}>{resultText}</td>;
 };
 
 class RobustCustomBridge extends Bridge {
@@ -69,8 +62,12 @@ class RobustCustomBridge extends Bridge {
         return { label: name, required: this.schema.required?.includes(name), ...field, ...override };
     }
     getSubfields(name) {
-        const excluded = ['Id', 'Products', 'Category'];
-        return name ? [] : Object.keys(this.schema.properties).filter(key => !excluded.includes(key));
+        return name ? [] : Object.keys(this.schema.properties).filter(key => {
+            const prop = this.schema.properties[key];
+            if (prop["x-identity"]) return false;
+            if (prop.type === "object" || prop.type === "array") return !!prop["x-relation"];
+            return true;
+        });
     }
     getType(name) {
         const field = this.getField(name);
@@ -81,17 +78,17 @@ class RobustCustomBridge extends Bridge {
     getValidator() { return this.validator; }
 }
 
-export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions = {} }) => {
+export const UniformEntityManager = ({ resource, schemaUrl, title }) => {
     const [schema, setSchema] = useState(null);
     const [loading, setLoading] = useState(true);
     const [fetchError, setFetchError] = useState(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
     const [rawApiData, setRawApiData] = useState([]);
-    const [resolvedSelectOptions, setResolvedSelectOptions] = useState(selectOptions);
+    const [resolvedSelectOptions, setResolvedSelectOptions] = useState({});
 
-    const { mutate: createMutation, isLoading: isCreating } = useCreate();
-    const { mutate: updateMutation, isLoading: isUpdating } = useUpdate();
+    const { mutate: createMutation } = useCreate();
+    const { mutate: updateMutation } = useUpdate();
     const { open } = useNotification();
     const { data: listData } = useList({ resource });
 
@@ -120,27 +117,30 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
 
     useEffect(() => {
         fetchBackupData();
-        fetch(schemaUrl).then(res => res.json()).then(data => { setSchema(data); setLoading(false); })
-            .catch(err => { setFetchError(err.message); setLoading(false); });
-
-        Object.keys(selectOptions).forEach(key => {
-            const opt = selectOptions[key];
-            if (opt.resource) {
-                fetch(`/api/${opt.resource}`).then(res => res.json()).then(data => {
-                    const list = Array.isArray(data) ? data : (data.data || []);
-                    const items = list.map(item => ({
-                        label: getVal(item, "Name") || getVal(item, "name") || String(item.id || item.Id),
-                        value: item.id || item.Id || item.ID
-                    }));
-                    setResolvedSelectOptions(prev => ({
-                        ...prev,
-                        [key]: { ...prev[key], options: items },
-                        [key.toLowerCase()]: { ...prev[key.toLowerCase()], options: items }
-                    }));
+        fetch(schemaUrl).then(res => res.json()).then(data => {
+            setSchema(data);
+            setLoading(false);
+            
+            if (data.properties) {
+                Object.entries(data.properties).forEach(([key, prop]) => {
+                    const relResource = prop["x-relation"];
+                    if (relResource) {
+                        fetch(`/api/${relResource}`).then(res => res.json()).then(listData => {
+                            const items = (Array.isArray(listData) ? listData : (listData.data || [])).map(item => ({
+                                label: getVal(item, "name") || getVal(item, "Name") || String(item.id || item.Id),
+                                value: item.id || item.Id || item.ID
+                            }));
+                            setResolvedSelectOptions(prev => ({
+                                ...prev,
+                                [key]: { options: items },
+                                [key.toLowerCase()]: { options: items }
+                            }));
+                        });
+                    }
                 });
             }
-        });
-    }, [schemaUrl, resource, selectOptions, fetchBackupData]);
+        }).catch(err => { setFetchError(err.message); setLoading(false); });
+    }, [schemaUrl, resource, fetchBackupData]);
 
     const bridge = useMemo(() => {
         if (!schema) return null;
@@ -169,13 +169,18 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
     if (loading) return <div style={{ textAlign: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
     if (fetchError) return <div style={{ color: 'red', padding: '20px' }}>{fetchError}</div>;
 
-    const fields = schema ? Object.keys(schema.properties).filter(k => k !== 'Products' && k !== 'Category' && k !== 'Id') : [];
+    const fields = schema ? Object.keys(schema.properties).filter(key => {
+        const prop = schema.properties[key];
+        if (prop["x-identity"]) return false;
+        if (prop.type === "object" || prop.type === "array") return !!prop["x-relation"];
+        return true;
+    }) : [];
 
     return (
         <div style={{ width: '100%' }}>
             {isFormOpen && (
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-                    <Card style={{ width: '100%', maxWidth: '600px', backgroundColor: '#f4f4f4' }}>
+                    <Card style={{ width: '100%', maxWidth: '1000px', backgroundColor: '#f4f4f4' }}>
                         <CardBody>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
                                 <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
@@ -185,16 +190,20 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
                             </div>
                             {bridge && (
                                 <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit}>
-                                    {fields.map(name => {
-                                        const isIdField = name.toLowerCase() === 'id';
-                                        if (isIdField && !selectedId) return null;
-                                        const prop = bridge.getProps(name);
-                                        const fieldProps = { key: name, name: name, disabled: isIdField && !!selectedId };
-                                        if (prop.options) return <SelectField {...fieldProps} options={prop.options} />;
-                                        if (prop.type === 'integer' || prop.type === 'number') return <NumberField {...fieldProps} />;
-                                        if (prop.type === 'boolean') return <BoolField {...fieldProps} />;
-                                        return <TextField {...fieldProps} />;
-                                    })}
+                                    <div className="form-grid-container">
+                                        {fields.map(name => {
+                                            const prop = bridge.getProps(name);
+                                            const fieldProps = { key: name, name: name };
+                                            return (
+                                                <div key={name} className="form-grid-item">
+                                                    {prop.options ? <SelectField {...fieldProps} options={prop.options} /> :
+                                                     (prop.type === 'integer' || prop.type === 'number') ? <NumberField {...fieldProps} /> :
+                                                     prop.type === 'boolean' ? <BoolField {...fieldProps} /> :
+                                                     <TextField {...fieldProps} />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                     <ErrorsField />
                                     <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                                         <Button fillMode="outline" type="button" onClick={() => { setIsFormOpen(false); setSelectedId(null); }}>Cancel</Button>
@@ -219,26 +228,27 @@ export const UniformEntityManager = ({ resource, schemaUrl, title, selectOptions
                 </div>
             </div>
 
-            <Grid data={entities} style={{ height: '400px' }} onRowClick={(e) => { setSelectedId(e.dataItem.id || e.dataItem.Id); setIsFormOpen(true); }}>
-                <GridColumn field="id" title="ID" width="80px" cell={(props) => <td {...props.tdProps}>{props.dataItem.id || props.dataItem.Id}</td>} />
+            <Grid data={entities} style={{ height: '400px' }} onRowClick={(e) => { 
+                const idKey = Object.keys(schema.properties).find(k => schema.properties[k]["x-identity"]) || "id";
+                setSelectedId(getVal(e.dataItem, idKey)); 
+                setIsFormOpen(true); 
+            }}>
+                <GridColumn field="id" title="ID" width="80px" cell={(props) => <td {...props.tdProps}>{getVal(props.dataItem, "id")}</td>} />
                 {fields.map(col => {
-                    const isCategoryId = col.toLowerCase() === "categoryid";
+                    const prop = schema.properties[col];
                     const dataKey = col.charAt(0).toLowerCase() + col.slice(1);
+                    const relationResource = prop["x-relation"];
+                    
+                    const title = relationResource ? relationResource.replace(/s$/, "").toUpperCase() : col.toUpperCase();
 
                     const CustomCell = (cellProps) => (
-                        <UniformLookupDataCell 
-                            {...cellProps} 
-                            resolvedSelectOptions={resolvedSelectOptions} 
-                            originalCol={col} 
-                        />
+                        <UniformLookupDataCell {...cellProps} resolvedSelectOptions={resolvedSelectOptions} originalCol={col} />
                     );
 
                     return (
                         <GridColumn 
-                            key={col} 
-                            field={dataKey} 
-                            title={isCategoryId ? "CATEGORY" : col.toUpperCase()} 
-                            cells={{ data: CustomCell }}
+                            key={col} field={dataKey} title={title} 
+                            cells={relationResource ? { data: CustomCell } : undefined}
                         />
                     );
                 })}

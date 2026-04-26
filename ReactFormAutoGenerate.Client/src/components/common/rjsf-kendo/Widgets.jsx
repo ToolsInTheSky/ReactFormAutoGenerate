@@ -10,10 +10,10 @@ const fieldStyle = {
 };
 
 const labelStyle = { 
-  width: '150px', 
+  width: '100px', 
   flexShrink: 0, 
-  textAlign: 'right', 
-  marginRight: '20px', 
+  textAlign: 'left', 
+  marginRight: '10px', 
   fontWeight: 'bold' 
 };
 
@@ -22,7 +22,7 @@ const inputContainerStyle = {
 };
 
 export const TextWidget = (props) => {
-  const { id, value, required, readonly, disabled, label, onChange, placeholder } = props;
+  const { id, value, required, readonly, disabled, label, onChange, placeholder, schema } = props;
   
   return (
     <div style={fieldStyle}>
@@ -39,6 +39,7 @@ export const TextWidget = (props) => {
           onChange={(e) => onChange(e.value)}
           placeholder={placeholder}
           style={{ width: '100%' }}
+          maxLength={schema.maxLength} // 스키마의 maxLength 전달
         />
       </div>
     </div>
