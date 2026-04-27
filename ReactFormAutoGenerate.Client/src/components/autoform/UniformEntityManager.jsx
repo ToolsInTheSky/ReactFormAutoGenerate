@@ -16,7 +16,7 @@ import { Card, CardBody } from "@progress/kendo-react-layout";
 import { Loader } from "@progress/kendo-react-indicators";
 
 import Form from './uniforms/Form';
-import AutoGrid from "./AutoGrid";
+import Grid from "./Grid";
 
 const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
 const toPluralCamelCase = (name) => toCamelCase(pluralize(name));
@@ -202,7 +202,7 @@ export const UniformEntityManager = ({ protocol = "rest", resource, entityName, 
             )}
 
             {/* Section 5: Data Grid View */}
-            <AutoGrid 
+            <Grid 
                 data={entities} schema={schema} lookups={lookupsMap} isLoading={loading || (isRest ? isListLoadingRest : isListLoadingGql)}
                 onRefresh={fetchData} onAdd={() => { setSelectedId(null); setIsFormOpen(true); }}
                 onRowClick={(id) => { setSelectedId(id); setIsFormOpen(true); }} resourceName={title || entityName}

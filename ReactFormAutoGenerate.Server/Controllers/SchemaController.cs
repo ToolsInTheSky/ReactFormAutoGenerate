@@ -58,16 +58,18 @@ public class SchemaController : ControllerBase
     public IActionResult GetAllSchemas()
     {
         var entities = new[] { typeof(Category), typeof(Product), typeof(InventoryItem) };
-        var schemas = new Dictionary<string, JObject>();
+        var schemas = new Dictionary<string, object>();
 
         foreach (var type in entities)
         {
             var schema = JsonSchema.FromType(type, Settings);
-            schemas[type.Name] = JObject.Parse(schema.ToJson());
+            // Serialize to string and back to object to avoid JObject/System.Text.Json conflict
+            var schemaJson = schema.ToJson();
+            schemas[type.Name] = System.Text.Json.JsonSerializer.Deserialize<object>(schemaJson)!;
         }
 
-        // 하위 호환성을 위해 RJSF/Uniforms 키 구조 유지 (값은 동일)
-        return Ok(new { RJSF = schemas, Uniforms = schemas });
+        // Maintain key structure for RJSF/Uniforms
+        return Ok(new { rjsf = schemas, uniforms = schemas });
     }
 
     [HttpGet("{name}")]

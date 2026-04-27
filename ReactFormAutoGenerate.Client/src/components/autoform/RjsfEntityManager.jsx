@@ -2,7 +2,7 @@
  * @file RjsfEntityManager.jsx
  * @description Orchestrator component for RJSF-based entity management.
  * It handles data fetching (schema, list, and lookups), state management for the form modal,
- * and renders both the AutoGrid and Form.
+ * and renders both the Grid and Form.
  * Supports both REST and GraphQL protocols via the "protocol" prop.
  */
 
@@ -12,7 +12,7 @@ import { GraphQLClient, gql } from "graphql-request";
 import axios from "axios";
 import pluralize from "pluralize";
 import Form from "./rjsf/Form";
-import AutoGrid from "./AutoGrid";
+import Grid from "./Grid";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -201,7 +201,7 @@ const RjsfEntityManager = ({ protocol = "rest", resource, entityName, schemaKey 
       )}
 
       {/* Section 6: Data Grid Section */}
-      <AutoGrid 
+      <Grid 
         data={records}
         schema={schema}
         lookups={lookups}
