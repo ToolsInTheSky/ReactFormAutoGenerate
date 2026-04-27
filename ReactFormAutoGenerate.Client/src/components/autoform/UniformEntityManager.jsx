@@ -15,8 +15,8 @@ import pluralize from "pluralize";
 import { Card, CardBody } from "@progress/kendo-react-layout";
 import { Loader } from "@progress/kendo-react-indicators";
 
-import UniformAutoForm from './UniformAutoForm';
-import AutoGrid from "../AutoGrid";
+import Form from './uniforms/Form';
+import AutoGrid from "./AutoGrid";
 
 const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
 const toPluralCamelCase = (name) => toCamelCase(pluralize(name));
@@ -184,7 +184,7 @@ export const UniformEntityManager = ({ protocol = "rest", resource, entityName, 
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
                     <Card style={{ width: '100%', maxWidth: '1000px', backgroundColor: '#f4f4f4' }}>
                         <CardBody>
-                            <UniformAutoForm 
+                            <Form 
                                 protocol={protocol}
                                 resource={actualResource}
                                 entityName={entityName || title}

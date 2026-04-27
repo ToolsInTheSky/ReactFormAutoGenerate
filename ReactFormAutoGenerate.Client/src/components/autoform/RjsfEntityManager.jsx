@@ -2,7 +2,7 @@
  * @file RjsfEntityManager.jsx
  * @description Orchestrator component for RJSF-based entity management.
  * It handles data fetching (schema, list, and lookups), state management for the form modal,
- * and renders both the AutoGrid and RjsfAutoForm.
+ * and renders both the AutoGrid and Form.
  * Supports both REST and GraphQL protocols via the "protocol" prop.
  */
 
@@ -11,8 +11,8 @@ import { useQuery, useQueries } from "@tanstack/react-query";
 import { GraphQLClient, gql } from "graphql-request";
 import axios from "axios";
 import pluralize from "pluralize";
-import RjsfAutoForm from "./RjsfAutoForm";
-import AutoGrid from "../AutoGrid";
+import Form from "./rjsf/Form";
+import AutoGrid from "./AutoGrid";
 
 const api = axios.create({ baseURL: "/api" });
 
@@ -185,7 +185,7 @@ const RjsfEntityManager = ({ protocol = "rest", resource, entityName, schemaKey 
       {editingId !== null && (
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
           <div style={{ width: '100%', maxWidth: '1000px', padding: '20px', border: '1px solid #ddd', borderRadius: '8px', backgroundColor: '#f4f4f4', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-            <RjsfAutoForm 
+            <Form 
                 protocol={protocol} 
                 id={editingId === "new" ? undefined : editingId} 
                 action={editingId === "new" ? "create" : "edit"}

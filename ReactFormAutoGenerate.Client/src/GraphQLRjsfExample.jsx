@@ -7,7 +7,7 @@
 
 import React, { useState } from "react";
 import { TabStrip, TabStripTab } from "@progress/kendo-react-layout";
-import RjsfEntityManager from "./components/autoform/rjsf/RjsfEntityManager";
+import RjsfEntityManager from "./components/autoform/RjsfEntityManager";
 
 /**
  * GraphQLRjsfExample Component

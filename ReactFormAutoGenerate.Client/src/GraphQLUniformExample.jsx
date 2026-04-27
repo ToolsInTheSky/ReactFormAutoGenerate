@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react';
 import { TabStrip, TabStripTab } from "@progress/kendo-react-layout";
-import { UniformEntityManager } from './components/autoform/uniforms/UniformEntityManager';
+import { UniformEntityManager } from './components/autoform/UniformEntityManager';
 
 /**
  * GraphQLUniformExample Component
