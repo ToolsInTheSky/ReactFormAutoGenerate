@@ -26,7 +26,7 @@ export const RestRjsfExample = () => {
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>REST + Refine + RJSF (Inventory System)</h2>
+        <h2 style={{ margin: 0 }}>REST + Refine + RJSF</h2>
       </div>
 
       {/* !!! IMPORTANT: Unified Entity Management !!!

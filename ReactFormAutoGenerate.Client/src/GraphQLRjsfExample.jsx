@@ -26,7 +26,7 @@ export const GraphQLRjsfExample = () => {
   return (
     <div style={{ padding: '20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>GraphQL + Refine + RJSF (KendoReact)</h2>
+        <h2 style={{ margin: 0 }}>GraphQL + Refine + RJSF</h2>
       </div>
 
       {/* !!! IMPORTANT: GraphQL Protocol Integration !!!

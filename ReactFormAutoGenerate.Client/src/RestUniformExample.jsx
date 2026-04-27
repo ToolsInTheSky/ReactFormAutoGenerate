@@ -26,7 +26,7 @@ export const RestUniformExample = () => {
     return (
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0 }}>REST + Refine + Uniforms (Auto-Config)</h2>
+                <h2 style={{ margin: 0 }}>REST + Refine + Uniforms</h2>
             </div>
 
             {/* !!! IMPORTANT: Unified Component Usage !!!

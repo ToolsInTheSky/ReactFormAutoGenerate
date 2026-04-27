@@ -5,12 +5,13 @@
  * into display labels via lookups, and handles specialized data types like dates.
  */
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Grid, GridColumn } from "@progress/kendo-react-grid";
 import { Button } from "@progress/kendo-react-buttons";
 import { Loader } from "@progress/kendo-react-indicators";
 import { plusIcon, arrowRotateCwIcon } from "@progress/kendo-svg-icons";
 import { SvgIcon } from "@progress/kendo-react-common";
+import { orderBy } from "@progress/kendo-data-query";
 import pluralize from "pluralize";
 
 /**
@@ -75,6 +76,7 @@ const AutoGrid = ({
     onRowClick, 
     resourceName 
 }) => {
+  const [sort, setSort] = useState([{ field: "id", dir: "desc" }]);
   
   /**
    * section: Column Extraction
@@ -121,7 +123,13 @@ const AutoGrid = ({
       </div>
 
       {/* !!! IMPORTANT: Kendo Grid Core !!! */}
-      <Grid data={data} style={{ height: '400px' }} onRowClick={(e) => {
+      <Grid 
+        data={orderBy(data, sort)} 
+        style={{ height: '400px' }} 
+        sortable={true}
+        sort={sort}
+        onSortChange={(e) => setSort(e.sort)}
+        onRowClick={(e) => {
           const idKey = Object.keys(schema.properties).find(k => schema.properties[k]["x-identity"]) || "id";
           onRowClick(getVal(e.dataItem, idKey), e.dataItem);
       }}>

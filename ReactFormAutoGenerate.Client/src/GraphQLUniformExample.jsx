@@ -26,7 +26,7 @@ export const GraphQLUniformExample = () => {
     return (
         <div style={{ padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ margin: 0 }}>GraphQL + Refine + Uniforms (KendoReact)</h2>
+                <h2 style={{ margin: 0 }}>GraphQL + Refine + Uniforms</h2>
             </div>
 
             {/* !!! IMPORTANT: Unified Component with GraphQL Protocol !!!
