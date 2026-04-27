@@ -257,9 +257,9 @@ const UniformAutoForm = ({
     const fields = bridge.getSubfields();
 
     return (
-        <div ref={formContainerRef}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
+        <div ref={formContainerRef} className="k-form">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '10px' }}>
+                <h3 className="form-section-header k-text-primary">
                     {id ? `Edit ${entityName || resource} #${id}` : `Add New ${entityName || resource}`}
                 </h3>
                 <Button fillMode="flat" onClick={onCancel}><SvgIcon icon={xIcon} /></Button>

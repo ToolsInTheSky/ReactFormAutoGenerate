@@ -263,9 +263,9 @@ const RjsfAutoForm = ({
   }
 
   return (
-    <div ref={formContainerRef}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
+    <div ref={formContainerRef} className="k-form">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid rgba(0,0,0,0.1)', paddingBottom: '10px' }}>
+        <h3 className="form-section-header k-text-primary">
           {action === "create" ? `Create New ${entityName || resource}` : `Edit ${entityName || resource} #${id}`}
         </h3>
         <Button fillMode="flat" onClick={onCancel}><SvgIcon icon={xIcon} /></Button>

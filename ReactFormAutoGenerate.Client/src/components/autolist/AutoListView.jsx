@@ -3,6 +3,7 @@
  * @description A generic, paginated list component designed to look like a Grid.
  * It dynamically generates headers and columns from JSON Schema properties,
  * including resolving related data (e.g., showing Category Name instead of CategoryId).
+ * Supports onRowClick callback for interactivity.
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -29,7 +30,7 @@ const getVal = (obj, key) => {
   return undefined;
 };
 
-const AutoListView = ({ protocol = "rest", resource, entityName, title }) => {
+const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowClick }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState({ skip: 0, take: 10 });
@@ -135,11 +136,26 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title }) => {
         alignItems: 'center'
     };
 
+    /**
+     * Custom Item Renderer (Grid Row)
+     */
     const GridRowRender = (props) => {
         const item = props.dataItem;
+        const id = getVal(item, "id");
+
         return (
-            <div style={{ ...gridStyle, padding: '12px 15px', borderBottom: '1px solid #eee' }}>
-                <div style={{ fontWeight: 'bold', color: '#666' }}>#{getVal(item, "id")}</div>
+            <div 
+                className="autolist-row"
+                style={{ 
+                    ...gridStyle, 
+                    padding: '12px 15px', 
+                    borderBottom: '1px solid #eee',
+                    cursor: onRowClick ? 'pointer' : 'default',
+                    transition: 'background-color 0.2s'
+                }}
+                onClick={() => onRowClick?.(id, item)}
+            >
+                <div style={{ fontWeight: 'bold', color: '#666' }}>#{id}</div>
                 {columns.map(col => {
                     const prop = schema.properties[col];
                     const val = getVal(item, col);
@@ -178,6 +194,7 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title }) => {
 
     return (
         <div style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+            {/* Custom Header Row */}
             <ListViewHeader style={{ 
                 ...gridStyle, 
                 padding: '12px 15px', 
@@ -192,8 +209,8 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title }) => {
                 {columns.map(col => {
                     const prop = schema.properties[col];
                     const relRes = prop["x-relation"];
-                    const title = relRes ? pluralize.singular(relRes).toUpperCase() : (prop.title || col).toUpperCase();
-                    return <div key={col}>{title}</div>;
+                    const titleStr = relRes ? pluralize.singular(relRes).toUpperCase() : (prop.title || col).toUpperCase();
+                    return <div key={col}>{titleStr}</div>;
                 })}
             </ListViewHeader>
             

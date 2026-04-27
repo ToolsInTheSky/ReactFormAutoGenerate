@@ -1,13 +1,11 @@
 /**
  * @file App.jsx
  * @description Main application component that configures global providers, routing, and layouts.
- * It integrates Refine for data management, KendoReact for UI components/notifications, 
- * and React Router for navigation between different schema-driven UI examples.
+ * Now supports dynamic KendoReact theme switching.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import './App.css';
-import '@progress/kendo-theme-default/dist/all.css';
 import SchemaFetcher from './components/autoform/SchemaFetcher';
 import { Refine } from "@refinedev/core";
 import dataProvider from "@refinedev/simple-rest";
@@ -19,8 +17,9 @@ import { Button } from "@progress/kendo-react-buttons";
 import { Card, CardBody, CardTitle } from "@progress/kendo-react-layout";
 import { Notification, NotificationGroup } from "@progress/kendo-react-notification";
 import { Fade } from "@progress/kendo-react-animation";
-import { arrowLeftIcon, chevronDownIcon, chevronUpIcon } from "@progress/kendo-svg-icons";
+import { arrowLeftIcon, chevronDownIcon, chevronUpIcon, paletteIcon } from "@progress/kendo-svg-icons";
 import { SvgIcon } from "@progress/kendo-react-common";
+import { DropDownList } from "@progress/kendo-react-dropdowns";
 
 import { RestRjsfExample } from './RestRjsfExample';
 import { RestUniformExample } from './RestUniformExample';
@@ -31,6 +30,16 @@ import { GraphQLListExample } from './GraphQLListExample';
 
 const API_URL = window.location.origin + "/api";
 const GQL_URL = window.location.origin + "/graphql";
+
+/**
+ * Theme Definitions
+ */
+const themes = [
+    { text: 'Default (Kendo)', id: 'default', href: 'https://unpkg.com/@progress/kendo-theme-default@13.1.1/dist/all.css' },
+    { text: 'Bootstrap', id: 'bootstrap', href: 'https://unpkg.com/@progress/kendo-theme-bootstrap@13.1.1/dist/all.css' },
+    { text: 'Material', id: 'material', href: 'https://unpkg.com/@progress/kendo-theme-material@13.1.1/dist/all.css' },
+    { text: 'Fluent', id: 'fluent', href: 'https://unpkg.com/@progress/kendo-theme-fluent@13.1.1/dist/all.css' }
+];
 
 /**
  * Custom Hook: useKendoNotification
@@ -88,7 +97,7 @@ const RefineContextWrapper = ({ children, notificationProvider }) => {
 /**
  * HomePage Component
  */
-const HomePage = () => {
+const HomePage = ({ currentTheme, onThemeChange }) => {
     const [showSchemas, setShowSchemas] = useState(false);
 
     return (
@@ -97,8 +106,22 @@ const HomePage = () => {
                 Schema-Driven UI Generator
             </h1>
             <p style={{ fontSize: '1.1rem', color: '#666', marginBottom: '30px' }}>
-                Explore dynamic Form generation and advanced List views using REST and GraphQL.
+                Explore dynamic Form generation and advanced List views with interchangeable KendoReact Themes.
             </p>
+
+            {/* Theme Selector Section */}
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '15px', marginBottom: '40px', padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '10px' }}>
+                <SvgIcon icon={paletteIcon} size="medium" />
+                <span style={{ fontWeight: 'bold' }}>Choose Theme:</span>
+                <DropDownList
+                    data={themes}
+                    textField="text"
+                    dataItemKey="id"
+                    value={currentTheme}
+                    onChange={(e) => onThemeChange(e.target.value)}
+                    style={{ width: '200px' }}
+                />
+            </div>
 
             <div style={{ marginBottom: '40px' }}>
                 <Button fillMode="outline" onClick={() => setShowSchemas(!showSchemas)}>
@@ -179,12 +202,28 @@ const HomePage = () => {
 
 function App() {
     const { notificationProps, notificationProvider } = useKendoNotification();
+    const [currentTheme, setCurrentTheme] = useState(themes[0]);
+
+    /**
+     * !!! IMPORTANT: Dynamic Theme Injection !!!
+     * Swaps the Kendo UI CSS link tag in the document head.
+     */
+    useEffect(() => {
+        let link = document.getElementById('kendo-theme-link');
+        if (!link) {
+            link = document.createElement('link');
+            link.id = 'kendo-theme-link';
+            link.rel = 'stylesheet';
+            document.head.appendChild(link);
+        }
+        link.href = currentTheme.href;
+    }, [currentTheme]);
 
     return (
         <BrowserRouter>
             <RefineContextWrapper notificationProvider={notificationProvider}>
                 <Routes>
-                    <Route index element={<HomePage />} />
+                    <Route index element={<HomePage currentTheme={currentTheme} onThemeChange={setCurrentTheme} />} />
                     <Route path="/rest-rjsf-example" element={
                         <div style={{ padding: '20px' }}>
                             <Link to="/" style={{ textDecoration: 'none' }}><Button fillMode="outline" style={{ marginBottom: '20px' }}><SvgIcon icon={arrowLeftIcon} /> Back</Button></Link>
