@@ -16,6 +16,7 @@ import { Button } from "@progress/kendo-react-buttons";
 import { Loader } from "@progress/kendo-react-indicators";
 import { xIcon, saveIcon, trashIcon } from "@progress/kendo-svg-icons";
 import { SvgIcon } from "@progress/kendo-react-common";
+import pluralize from "pluralize";
 
 import { widgets } from "./Widgets";
 import { ObjectFieldTemplate } from "./ObjectFieldTemplate";
@@ -55,14 +56,19 @@ const RjsfAutoForm = ({
   record = null 
 }) => {
   const formRef = React.useRef(null);
+  const formContainerRef = React.useRef(null);
   const queryClient = useQueryClient();
 
   const isRest = protocol === "rest";
-  const actualResource = isRest ? resource : (entityName.toLowerCase() + "s");
+  
+  /**
+   * !!! IMPORTANT: Protocol-specific resource naming !!!
+   * For GraphQL, we use correctly pluralized camelCase names.
+   */
+  const actualResource = isRest ? resource : toCamelCase(pluralize(entityName || ""));
   const dataProviderName = isRest ? "default" : "graphql";
 
   // section 1: !!! IMPORTANT: Relationship Resolution !!!
-  // Fetches lookup data for ComboBoxes. Strategy changes based on REST or GraphQL.
   const relQueriesResults = useQueries({
     queries: relations.map(rel => ({
       queryKey: isRest ? [rel.resource] : ["gql-lookup-options", rel.resource],
@@ -99,11 +105,12 @@ const RjsfAutoForm = ({
   }, [relQueriesResults, relations]);
 
   // section 2: Refine useForm Integration
+  // !!! IMPORTANT: dataProviderName must be at the top level of options !!!
   const { onFinish, queryResult, formLoading } = useForm({
-    action: action,
+    action,
     resource: actualResource,
-    id: id,
-    meta: isRest ? {} : { dataProviderName },
+    id,
+    dataProviderName,
     onMutationSuccess: () => {
       if (isRest) {
         queryClient.invalidateQueries({ queryKey: [resource] });
@@ -118,23 +125,24 @@ const RjsfAutoForm = ({
   const initialData = queryResult?.data?.data;
 
   // section 3: !!! IMPORTANT: Schema Cleaning & Transformation !!!
-  // Strips technical fields (like $schema, ID) and injects lookup options (oneOf) into relational fields.
   const cleanedSchema = useMemo(() => {
     if (!schema) return null;
     const s = JSON.parse(JSON.stringify(schema));
     delete s.$schema;
 
     if (s.properties) {
-      const idKey = Object.keys(s.properties).find(k => k.toLowerCase() === "id");
-      if (idKey) delete s.properties[idKey];
-      
       const keysToDelete = [];
       Object.keys(s.properties).forEach(key => {
         const prop = s.properties[key];
         const lowerKey = key.toLowerCase();
-        const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
+
+        // Exclude identity fields (ID)
+        if (prop["x-identity"] || lowerKey === "id") {
+          keysToDelete.push(key);
+          return;
+        }
         
-        // Filter out complex nested types that aren't explicit relations
+        const isRelation = !!relations.find(r => r.field.toLowerCase() === lowerKey);
         const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
                          (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array"))) ||
                          prop.anyOf || prop.oneOf;
@@ -148,7 +156,6 @@ const RjsfAutoForm = ({
           prop.title = key.replace(/([A-Z])/g, ' $1').trim();
         }
 
-        // section: Inject ComboBox Options
         if (relOptions[lowerKey]) {
           prop.oneOf = relOptions[lowerKey];
           prop.type = "integer";
@@ -159,16 +166,13 @@ const RjsfAutoForm = ({
 
       keysToDelete.forEach(k => delete s.properties[k]);
       if (s.required && Array.isArray(s.required)) {
-        s.required = s.required.filter(reqKey => !keysToDelete.includes(reqKey) && reqKey.toLowerCase() !== "id");
+        s.required = s.required.filter(reqKey => !keysToDelete.includes(reqKey));
       }
     }
     return s;
   }, [schema, relOptions, relations]);
 
-  /**
-   * section 4: Data Normalization
-   * Maps server response data to form field keys, handling type casting (e.g., empty string to number).
-   */
+  // section 4: Data Normalization
   const finalData = useMemo(() => {
     const data = {};
     if (cleanedSchema?.properties) {
@@ -187,40 +191,45 @@ const RjsfAutoForm = ({
     return data;
   }, [cleanedSchema, record, initialData, isRest]);
 
-  /**
-   * Handles deletion with confirmation.
-   */
+  // section: Auto-focus logic
+  React.useEffect(() => {
+    if (!formLoading && formContainerRef.current && cleanedSchema) {
+        const firstEditableInput = formContainerRef.current.querySelector(
+            'input:not([disabled]):not([readonly]):not([type="hidden"]), ' +
+            'textarea:not([disabled]):not([readonly]), ' +
+            '.k-dropdownlist:not(.k-disabled), ' +
+            '[role="combobox"]:not([aria-disabled="true"])'
+        );
+        if (firstEditableInput) {
+            setTimeout(() => firstEditableInput.focus(), 200);
+        }
+    }
+  }, [cleanedSchema, id, formLoading]);
+
   const handleDelete = () => {
     if (window.confirm("Are you sure you want to delete this item?")) {
       deleteMutate(
-        { 
-          resource: actualResource, 
-          id: id, 
-          meta: isRest ? {} : { dataProviderName } 
-        },
-        { 
-          onSuccess: () => onCancel() 
-        }
+        { resource: actualResource, id: id, dataProviderName },
+        { onSuccess: () => onCancel() }
       );
     }
   };
 
-  const uiSchema = { "ui:submitButtonOptions": { "norender": true } };
-  Object.keys(cleanedSchema?.properties || {}).forEach(key => {
-    uiSchema[key] = { "ui:label": false };
-  });
+  const uiSchema = useMemo(() => {
+    const ui = { "ui:submitButtonOptions": { "norender": true } };
+    if (cleanedSchema?.properties) {
+        Object.keys(cleanedSchema.properties).forEach(key => {
+            ui[key] = { "ui:label": false };
+        });
+    }
+    return ui;
+  }, [cleanedSchema]);
 
-  /**
-   * section 5: !!! IMPORTANT: Error Transformation !!!
-   * Converts technical AJV validation errors into clean English sentences and deduplicates by field.
-   */
   const transformErrors = (errors) => {
     const uniqueErrors = [];
     const seenFields = new Set();
-
     errors.forEach((error) => {
       const { name, property, message, params } = error;
-      
       if (!property || property === ".") {
         if (message && message.includes("no schema with key")) {
           error.message = "Schema validation setup error.";
@@ -229,14 +238,11 @@ const RjsfAutoForm = ({
         }
         return;
       }
-
       const fieldName = property.replace(/^[.\[]|['"\]]/g, "");
       const propertyKeys = Object.keys(cleanedSchema.properties || {});
       const actualKey = propertyKeys.find(k => k.toLowerCase() === fieldName.toLowerCase()) || fieldName;
       const fieldTitle = cleanedSchema.properties[actualKey]?.title || actualKey;
-
       if (seenFields.has(property)) return;
-
       let friendlyMessage = "";
       if (name === "required") friendlyMessage = "is required";
       else if (name === "const" || name === "oneOf" || name === "anyOf") friendlyMessage = "selection is invalid. Please select a valid option.";
@@ -244,14 +250,11 @@ const RjsfAutoForm = ({
       else if (name === "type") friendlyMessage = "has an invalid value type";
       else if (message && (message.includes("match exactly one schema") || message.includes("must be equal to constant"))) friendlyMessage = "selection is invalid";
       else friendlyMessage = message;
-
       error.message = friendlyMessage;
       error.stack = `${fieldTitle} ${friendlyMessage}`;
-      
       uniqueErrors.push(error);
       seenFields.add(property);
     });
-
     return uniqueErrors;
   };
 
@@ -260,38 +263,26 @@ const RjsfAutoForm = ({
   }
 
   return (
-    <div>
-      {/* Form Header */}
+    <div ref={formContainerRef}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
         <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
           {action === "create" ? `Create New ${entityName || resource}` : `Edit ${entityName || resource} #${id}`}
         </h3>
         <Button fillMode="flat" onClick={onCancel}><SvgIcon icon={xIcon} /></Button>
       </div>
-
-      {/* !!! IMPORTANT: RJSF Core Form !!! */}
       <Form 
-        ref={formRef} 
-        schema={cleanedSchema} 
-        uiSchema={uiSchema} 
-        validator={validator} 
-        formData={finalData}
-        widgets={widgets}
-        templates={{ ObjectFieldTemplate }}
-        transformErrors={transformErrors}
+        ref={formRef} schema={cleanedSchema} uiSchema={uiSchema} validator={validator} formData={finalData}
+        widgets={widgets} templates={{ ObjectFieldTemplate }} transformErrors={transformErrors}
         onSubmit={({ formData }) => {
             const payload = {};
             Object.keys(formData).forEach(key => {
                 const mappedKey = isRest ? toPascalCase(key) : toCamelCase(key);
                 payload[mappedKey] = formData[key];
             });
-            if (isRest && id) {
-                payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
-            }
+            if (isRest && id) payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
             onFinish(payload);
         }}
       >
-        {/* Form Footer Action Buttons */}
         <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
           {action === "edit" && (
             <div style={{ marginRight: 'auto' }}>

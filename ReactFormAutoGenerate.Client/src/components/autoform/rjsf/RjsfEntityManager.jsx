@@ -85,15 +85,20 @@ const RjsfEntityManager = ({ protocol = "rest", resource, entityName, schemaKey 
     const fields = Object.keys(schema.properties)
         .filter(key => {
             const prop = schema.properties[key];
-            // Exclude ID
-            if (prop["x-identity"]) return false;
+            const lowerKey = key.toLowerCase();
+
+            // Exclude identity fields
+            if (prop["x-identity"] || lowerKey === "id") return false;
 
             // Identify complex types ($ref, object, array, oneOf, anyOf)
-            const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
-                             prop.oneOf || prop.anyOf ||
-                             (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
+            const isArray = prop.type === "array" || (Array.isArray(prop.type) && prop.type.includes("array"));
+            const isObject = prop.type === "object" || (Array.isArray(prop.type) && prop.type.includes("object"));
+            const hasComposition = prop.oneOf || prop.anyOf || prop.$ref;
+
+            const isComplex = isArray || isObject || hasComposition;
             
             // Only allow if it's a simple type OR a complex type with explicit relation mapping
+            // IMPORTANT: Never request technical navigation properties or arrays without subfields
             if (isComplex && !prop["x-relation"]) return false;
             
             return true;

@@ -85,6 +85,11 @@ export const TextWidget = (props) => {
  */
 export const DateTimeWidget = (props) => {
     const { id, value, required, readonly, disabled, label, onChange } = props;
+    
+    // Check for C# min date or empty values
+    const isInvalidDate = !value || value.startsWith("0001-01-01");
+    const dateValue = isInvalidDate ? null : new Date(value);
+
     return (
       <div style={fieldStyle}>
         <Label editorId={id} style={labelStyle}>
@@ -93,7 +98,7 @@ export const DateTimeWidget = (props) => {
         <div style={inputContainerStyle}>
           <DateTimePicker
             id={id}
-            value={value ? new Date(value) : null}
+            value={dateValue}
             disabled={disabled || readonly}
             onChange={(e) => onChange(e.value?.toISOString())}
             style={{ width: '100%' }}

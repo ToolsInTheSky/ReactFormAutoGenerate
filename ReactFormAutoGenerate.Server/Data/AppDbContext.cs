@@ -33,5 +33,14 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(i => i.ProductId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Set default value for UpdateDate
+        modelBuilder.Entity<Product>()
+            .Property(p => p.UpdateDate)
+            .HasDefaultValueSql("now()");
+
+        modelBuilder.Entity<InventoryItem>()
+            .Property(i => i.UpdateDate)
+            .HasDefaultValueSql("now()");
     }
 }

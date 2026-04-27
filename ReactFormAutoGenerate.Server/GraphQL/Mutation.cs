@@ -7,91 +7,147 @@ namespace ReactFormAutoGenerate.Server.GraphQL;
 
 public class Mutation
 {
-    public async Task<Category> CreateCategoryAsync(string name, AppDbContext context)
+    // --- Category Mutations ---
+
+    public record CreateCategoryInput(string Name);
+    public record CreateOneCategoryInput(CreateCategoryInput Category);
+
+    public async Task<Category> CreateOneCategoryAsync(
+        CreateOneCategoryInput input, [Service] AppDbContext context)
     {
-        var category = new Category { Name = name };
+        var category = new Category { Name = input.Category.Name };
         context.Categories.Add(category);
         await context.SaveChangesAsync();
         return category;
     }
 
-    public async Task<Category> UpdateCategoryAsync(int id, string name, AppDbContext context)
+    public record UpdateCategoryInput(string Name, bool? IsUse);
+    public record UpdateOneCategoryInput([ID] int Id, UpdateCategoryInput Update);
+
+    public async Task<Category> UpdateOneCategoryAsync(
+        UpdateOneCategoryInput input, [Service] AppDbContext context)
     {
-        var category = await context.Categories.FindAsync(id);
+        var category = await context.Categories.FindAsync(input.Id);
         if (category == null) throw new Exception("Category not found");
-        category.Name = name;
+        
+        category.Name = input.Update.Name;
+        if (input.Update.IsUse.HasValue) category.IsUse = input.Update.IsUse.Value;
+        
         await context.SaveChangesAsync();
         return category;
     }
 
-    public async Task<Product> CreateProductAsync(
-        string name, decimal price, int categoryId, string? description, AppDbContext context)
+    public record DeleteOneCategoryInput([ID] int Id);
+
+    public async Task<Category> DeleteOneCategoryAsync(
+        DeleteOneCategoryInput input, [Service] AppDbContext context)
     {
-        var product = new Product { Name = name, Price = price, CategoryId = categoryId, Description = description };
+        var category = await context.Categories.FindAsync(input.Id);
+        if (category == null) throw new Exception("Category not found");
+        context.Categories.Remove(category);
+        await context.SaveChangesAsync();
+        return category;
+    }
+
+    // --- Product Mutations ---
+
+    public record CreateProductInput(string Name, decimal Price, int CategoryId, string? Description, DateTime? UpdateDate);
+    public record CreateOneProductInput(CreateProductInput Product);
+
+    public async Task<Product> CreateOneProductAsync(
+        CreateOneProductInput input, [Service] AppDbContext context)
+    {
+        var product = new Product 
+        { 
+            Name = input.Product.Name, 
+            Price = input.Product.Price, 
+            CategoryId = input.Product.CategoryId,
+            Description = input.Product.Description,
+            UpdateDate = input.Product.UpdateDate ?? DateTime.UtcNow
+        };
         context.Products.Add(product);
         await context.SaveChangesAsync();
         return product;
     }
 
-    public async Task<Product> UpdateProductAsync(
-        int id, string name, decimal price, int categoryId, string? description, AppDbContext context)
+    public record UpdateProductInput(string Name, decimal Price, int CategoryId, string? Description, DateTime? UpdateDate);
+    public record UpdateOneProductInput([ID] int Id, UpdateProductInput Update);
+
+    public async Task<Product> UpdateOneProductAsync(
+        UpdateOneProductInput input, [Service] AppDbContext context)
     {
-        var product = await context.Products.FindAsync(id);
+        var product = await context.Products.FindAsync(input.Id);
         if (product == null) throw new Exception("Product not found");
-        product.Name = name;
-        product.Price = price;
-        product.CategoryId = categoryId;
-        product.Description = description;
+        
+        product.Name = input.Update.Name;
+        product.Price = input.Update.Price;
+        product.CategoryId = input.Update.CategoryId;
+        product.Description = input.Update.Description;
+        product.UpdateDate = input.Update.UpdateDate ?? DateTime.UtcNow;
+        
         await context.SaveChangesAsync();
         return product;
     }
 
-    public async Task<bool> DeleteProductAsync(int id, AppDbContext context)
+    public record DeleteOneProductInput([ID] int Id);
+
+    public async Task<Product> DeleteOneProductAsync(
+        DeleteOneProductInput input, [Service] AppDbContext context)
     {
-        var product = await context.Products.FindAsync(id);
-        if (product == null) return false;
+        var product = await context.Products.FindAsync(input.Id);
+        if (product == null) throw new Exception("Product not found");
         context.Products.Remove(product);
         await context.SaveChangesAsync();
-        return true;
+        return product;
     }
 
-    public async Task<bool> DeleteCategoryAsync(int id, AppDbContext context)
-    {
-        var category = await context.Categories.FindAsync(id);
-        if (category == null) return false;
-        context.Categories.Remove(category);
-        await context.SaveChangesAsync();
-        return true;
-    }
+    // --- InventoryItem Mutations ---
 
-    public async Task<InventoryItem> CreateInventoryItemAsync(
-        int productId, int stockQuantity, string? note, AppDbContext context)
+    public record CreateInventoryItemInput(int ProductId, int StockQuantity, string? Note, DateTime? UpdateDate);
+    public record CreateOneInventoryItemInput(CreateInventoryItemInput InventoryItem);
+
+    public async Task<InventoryItem> CreateOneInventoryItemAsync(
+        CreateOneInventoryItemInput input, [Service] AppDbContext context)
     {
-        var item = new InventoryItem { ProductId = productId, StockQuantity = stockQuantity, Note = note, UpdateDate = DateTime.UtcNow };
+        var item = new InventoryItem 
+        { 
+            ProductId = input.InventoryItem.ProductId, 
+            StockQuantity = input.InventoryItem.StockQuantity, 
+            Note = input.InventoryItem.Note,
+            UpdateDate = input.InventoryItem.UpdateDate ?? DateTime.UtcNow 
+        };
         context.InventoryItems.Add(item);
         await context.SaveChangesAsync();
         return item;
     }
 
-    public async Task<InventoryItem> UpdateInventoryItemAsync(
-        int id, int productId, int stockQuantity, string? note, AppDbContext context)
+    public record UpdateInventoryItemInput(int ProductId, int StockQuantity, string? Note, DateTime? UpdateDate);
+    public record UpdateOneInventoryItemInput([ID] int Id, UpdateInventoryItemInput Update);
+
+    public async Task<InventoryItem> UpdateOneInventoryItemAsync(
+        UpdateOneInventoryItemInput input, [Service] AppDbContext context)
     {
-        var item = await context.InventoryItems.FindAsync(id);
+        var item = await context.InventoryItems.FindAsync(input.Id);
         if (item == null) throw new Exception("Inventory item not found");
-        item.ProductId = productId;
-        item.StockQuantity = stockQuantity;
-        item.Note = note;
-        item.UpdateDate = DateTime.UtcNow;
+        
+        item.ProductId = input.Update.ProductId;
+        item.StockQuantity = input.Update.StockQuantity;
+        item.Note = input.Update.Note;
+        item.UpdateDate = input.Update.UpdateDate ?? DateTime.UtcNow;
+        
         await context.SaveChangesAsync();
         return item;
     }
 
-    public async Task<bool> DeleteInventoryItemAsync(int id, AppDbContext context)
+    public record DeleteOneInventoryItemInput([ID] int Id);
+
+    public async Task<InventoryItem> DeleteOneInventoryItemAsync(
+        DeleteOneInventoryItemInput input, [Service] AppDbContext context)
     {
-        var item = await context.InventoryItems.FindAsync(id);
-        if (item == null) return false;
+        var item = await context.InventoryItems.FindAsync(input.Id);
+        if (item == null) throw new Exception("Inventory item not found");
         context.InventoryItems.Remove(item);
         await context.SaveChangesAsync();
-        return true;
+        return item;
     }
 }

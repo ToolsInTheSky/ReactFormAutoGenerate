@@ -179,23 +179,29 @@ const BoolInput = ({ id, label, value, onChange, disabled, required, error, show
  * DateInput Component
  * Integration with Kendo DateTimePicker.
  */
-const DateInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => (
-  <div style={fieldStyle}>
-    <Label editorId={id} style={labelStyle}>
-      {label}{required && <span className="k-required">*</span>}
-    </Label>
-    <div style={inputContainerStyle}>
-      <DateTimePicker
-        id={id}
-        value={value ? new Date(value) : null}
-        onChange={e => onChange(e.value?.toISOString())}
-        disabled={disabled}
-        style={{ width: '100%' }}
-      />
-      {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+const DateInput = ({ id, label, value, onChange, disabled, required, error, showInlineError }) => {
+  // Check for C# min date or empty values
+  const isInvalidDate = !value || value.startsWith("0001-01-01");
+  const dateValue = isInvalidDate ? null : new Date(value);
+
+  return (
+    <div style={fieldStyle}>
+      <Label editorId={id} style={labelStyle}>
+        {label}{required && <span className="k-required">*</span>}
+      </Label>
+      <div style={inputContainerStyle}>
+        <DateTimePicker
+          id={id}
+          value={dateValue}
+          onChange={e => onChange(e.value?.toISOString())}
+          disabled={disabled}
+          style={{ width: '100%' }}
+        />
+        {showInlineError && error && <div className="k-form-error" style={{ color: 'red', fontSize: '12px' }}>{error.message}</div>}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * !!! IMPORTANT: Uniforms Field Mapping !!!

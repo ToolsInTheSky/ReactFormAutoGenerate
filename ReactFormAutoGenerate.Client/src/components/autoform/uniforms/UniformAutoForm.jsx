@@ -16,6 +16,7 @@ import { Button } from "@progress/kendo-react-buttons";
 import { SvgIcon } from "@progress/kendo-react-common";
 import { xIcon, trashIcon } from "@progress/kendo-svg-icons";
 import { Loader } from "@progress/kendo-react-indicators";
+import pluralize from "pluralize";
 
 import { TextField, NumberField, SelectField, BoolField, DateField, SubmitField, ErrorsField } from './Fields';
 
@@ -86,11 +87,12 @@ class RobustCustomBridge extends Bridge {
     getSubfields(name) {
         return name ? [] : Object.keys(this.schema.properties).filter(key => {
             const prop = this.schema.properties[key];
+            const lowerKey = key.toLowerCase();
+
             // Exclude identity fields (ID)
-            if (prop["x-identity"]) return false;
+            if (prop["x-identity"] || lowerKey === "id") return false;
             
             // Check if it's a complex type (object, array, $ref, oneOf, anyOf)
-            // Some schemas use oneOf without a top-level type
             const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
                              prop.oneOf || prop.anyOf ||
                              (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array")));
@@ -128,18 +130,25 @@ const UniformAutoForm = ({
     selectOptions = {},
     initialRecord = null 
 }) => {
-    const isRest = protocol === "rest";
+    const formContainerRef = React.useRef(null);
     const { open } = useNotification();
+    
+    const isRest = protocol === "rest";
+    
+    /**
+     * !!! IMPORTANT: Protocol-specific resource naming !!!
+     * For GraphQL, we use correctly pluralized camelCase names.
+     */
+    const actualResource = isRest ? resource : toCamelCase(pluralize(entityName || ""));
     const dataProviderName = isRest ? "default" : "graphql";
 
     // section: Refine Integration
     const { onFinish, queryResult, formLoading } = useForm({
         action,
-        resource,
+        resource: actualResource,
         id,
-        meta: { dataProviderName },
+        dataProviderName,
         onMutationSuccess: () => {
-            open?.({ type: "success", message: "Success" });
             onSuccess?.();
             onCancel();
         }
@@ -158,27 +167,22 @@ const UniformAutoForm = ({
             const keysToDelete = [];
             Object.keys(s.properties).forEach(key => {
                 const prop = s.properties[key];
-                
-                // Exclude identity fields
-                if (prop["x-identity"]) {
+                const lowerKey = key.toLowerCase();
+
+                // Exclude identity fields (ID)
+                if (prop["x-identity"] || lowerKey === "id") {
                     keysToDelete.push(key);
                     return;
                 }
-
-                // Identify complex navigation properties ($ref, object, array)
+                
                 const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || 
                                  (Array.isArray(prop.type) && (prop.type.includes("object") || prop.type.includes("array"))) ||
                                  prop.anyOf || prop.oneOf;
-                
-                // If it's complex but has no relation mapping, it's a technical navigation property to be removed
                 if (isComplex && !prop["x-relation"]) {
                     keysToDelete.push(key);
                 }
             });
-
             keysToDelete.forEach(k => delete s.properties[k]);
-            
-            // Clean up required array
             if (s.required && Array.isArray(s.required)) {
                 s.required = s.required.filter(reqKey => !keysToDelete.includes(reqKey));
             }
@@ -194,29 +198,39 @@ const UniformAutoForm = ({
 
     /**
      * section: Data Normalization
-     * Adapts incoming server data (PascalCase/camelCase) to the internal form model.
      */
     const formModel = useMemo(() => {
         const source = initialRecord || serverData;
-        if (!source || !schema?.properties) return {};
+        if (!source || !bridge?.schema?.properties) return {};
         const mapped = {};
-        Object.keys(schema.properties).forEach(key => {
+        Object.keys(bridge.schema.properties).forEach(key => {
             const val = isRest ? (source[key] ?? source[toPascalCase(key)] ?? source[toCamelCase(key)]) : (source[toCamelCase(key)] ?? source[key]);
             if (val !== undefined) mapped[key] = val;
         });
         return mapped;
-    }, [initialRecord, serverData, schema, isRest]);
+    }, [initialRecord, serverData, bridge, isRest]);
 
-    /**
-     * Handles item deletion with a confirmation prompt.
-     */
+    // section: Auto-focus first field
+    // !!! IMPORTANT: Call hook before early return !!!
+    React.useEffect(() => {
+        if (!formLoading && formContainerRef.current && bridge) {
+            // Look for the first input/textarea/combobox that is NOT disabled, NOT readonly, and NOT hidden
+            const firstEditableInput = formContainerRef.current.querySelector(
+                'input:not([disabled]):not([readonly]):not([type="hidden"]), ' +
+                'textarea:not([disabled]):not([readonly]), ' +
+                '.k-dropdownlist:not(.k-disabled), ' +
+                '[role="combobox"]:not([aria-disabled="true"])'
+            );
+            if (firstEditableInput) {
+                // Slightly more delay to ensure Kendo components are fully interactive
+                setTimeout(() => firstEditableInput.focus(), 200);
+            }
+        }
+    }, [bridge, id, formLoading]);
+
     const handleDelete = () => {
         if (window.confirm("Are you sure you want to delete this item?")) {
-            deleteMutation({
-                resource,
-                id,
-                meta: { dataProviderName }
-            }, {
+            deleteMutation({ resource, id, meta: { dataProviderName } }, {
                 onSuccess: () => {
                     open?.({ type: "success", message: "Deleted successfully" });
                     onSuccess?.();
@@ -226,19 +240,13 @@ const UniformAutoForm = ({
         }
     };
 
-    /**
-     * Final submission handler that maps form data back to the protocol-specific format.
-     */
     const onSubmit = (formData) => {
         const payload = {};
         Object.keys(formData).forEach(key => {
             const mappedKey = isRest ? toPascalCase(key) : toCamelCase(key);
             payload[mappedKey] = formData[key];
         });
-        // Include ID for REST PUT requests if required by backend
-        if (isRest && id) {
-            payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
-        }
+        if (isRest && id) payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
         onFinish(payload);
     };
 
@@ -249,8 +257,7 @@ const UniformAutoForm = ({
     const fields = bridge.getSubfields();
 
     return (
-        <div>
-            {/* Form Header */}
+        <div ref={formContainerRef}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', borderBottom: '1px solid #ddd', paddingBottom: '10px' }}>
                 <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#ff6358', fontWeight: 'bold' }}>
                     {id ? `Edit ${entityName || resource} #${id}` : `Add New ${entityName || resource}`}
@@ -258,7 +265,6 @@ const UniformAutoForm = ({
                 <Button fillMode="flat" onClick={onCancel}><SvgIcon icon={xIcon} /></Button>
             </div>
             
-            {/* !!! IMPORTANT: Uniforms Form Rendering !!! */}
             <AutoForm schema={bridge} model={formModel} onSubmit={onSubmit}>
                 <div className="form-grid-container">
                     {fields.map(name => {
@@ -279,7 +285,6 @@ const UniformAutoForm = ({
                 
                 <ErrorsField />
 
-                {/* Form Footer Action Buttons */}
                 <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                     {id && (
                         <div style={{ marginRight: 'auto' }}>

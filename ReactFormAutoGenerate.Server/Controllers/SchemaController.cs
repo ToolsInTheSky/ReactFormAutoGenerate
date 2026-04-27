@@ -19,8 +19,40 @@ public class SchemaController : ControllerBase
     {
         DefaultReferenceTypeNullHandling = ReferenceTypeNullHandling.NotNull,
         GenerateAbstractProperties = true,
-        SchemaType = SchemaType.JsonSchema
+        SchemaType = SchemaType.JsonSchema,
+        SchemaProcessors = { new CustomMetadataProcessor() }
     };
+
+    public class CustomMetadataProcessor : ISchemaProcessor
+    {
+        public void Process(SchemaProcessorContext context)
+        {
+            if (context.Schema.Properties == null) return;
+
+            foreach (var prop in context.ContextualType.Type.GetProperties())
+            {
+                if (context.Schema.Properties.TryGetValue(prop.Name, out var jsonProp))
+                {
+                    if (jsonProp.ExtensionData == null) jsonProp.ExtensionData = new Dictionary<string, object?>();
+                    
+                    // Add x-identity for properties with [Key] attribute or named "Id"
+                    if (prop.GetCustomAttribute<KeyAttribute>() != null || 
+                        string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        jsonProp.ExtensionData["x-identity"] = true;
+                    }
+
+                    // Add x-relation for foreign key fields (convention: EntityId)
+                    if (prop.Name.Length > 2 && prop.Name.EndsWith("Id"))
+                    {
+                        var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
+                        var entityBaseName = fkAttr?.Name ?? prop.Name.Substring(0, prop.Name.Length - 2);
+                        jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
+                    }
+                }
+            }
+        }
+    }
 
     [HttpGet("all")]
     public IActionResult GetAllSchemas()
@@ -31,7 +63,6 @@ public class SchemaController : ControllerBase
         foreach (var type in entities)
         {
             var schema = JsonSchema.FromType(type, Settings);
-            ProcessCustomMetadata(schema, type);
             schemas[type.Name] = JObject.Parse(schema.ToJson());
         }
 
@@ -46,28 +77,8 @@ public class SchemaController : ControllerBase
         if (type == null) return NotFound($"Entity '{name}' not found.");
 
         var schema = JsonSchema.FromType(type, Settings);
-        ProcessCustomMetadata(schema, type);
         
         return Content(schema.ToJson(), "application/json");
-    }
-
-    public static void ProcessCustomMetadata(JsonSchema schema, Type type)
-    {
-        foreach (var prop in type.GetProperties())
-        {
-            if (schema.Properties != null && schema.Properties.TryGetValue(prop.Name, out var jsonProp))
-            {
-                if (jsonProp.ExtensionData == null) jsonProp.ExtensionData = new Dictionary<string, object>();
-                if (prop.GetCustomAttribute<KeyAttribute>() != null) jsonProp.ExtensionData["x-identity"] = true;
-                
-                if (prop.Name.Length > 2 && prop.Name.EndsWith("Id"))
-                {
-                    var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
-                    var entityBaseName = fkAttr?.Name ?? prop.Name.Substring(0, prop.Name.Length - 2);
-                    jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
-                }
-            }
-        }
     }
 
     private Type? GetEntityType(string name)

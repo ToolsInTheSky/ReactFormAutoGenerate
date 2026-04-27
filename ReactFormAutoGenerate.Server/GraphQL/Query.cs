@@ -1,6 +1,7 @@
 using HotChocolate;
 using HotChocolate.Data;
 using HotChocolate.Types;
+using Microsoft.EntityFrameworkCore;
 using NJsonSchema;
 using ReactFormAutoGenerate.Server.Data;
 using ReactFormAutoGenerate.Server.Entities;
@@ -17,6 +18,10 @@ public class Query
     public IQueryable<Category> GetCategories(AppDbContext context) =>
         context.Categories;
 
+    [UseProjection]
+    public Task<Category?> GetCategoryAsync([ID] int id, AppDbContext context) =>
+        context.Categories.FirstOrDefaultAsync(c => c.Id == id);
+
     [UseOffsetPaging(IncludeTotalCount = true)]
     [UseProjection]
     [UseFiltering]
@@ -24,12 +29,20 @@ public class Query
     public IQueryable<Product> GetProducts(AppDbContext context) =>
         context.Products;
 
+    [UseProjection]
+    public Task<Product?> GetProductAsync([ID] int id, AppDbContext context) =>
+        context.Products.FirstOrDefaultAsync(p => p.Id == id);
+
     [UseOffsetPaging(IncludeTotalCount = true)]
     [UseProjection]
     [UseFiltering]
     [UseSorting]
     public IQueryable<InventoryItem> GetInventoryItems(AppDbContext context) =>
         context.InventoryItems;
+
+    [UseProjection]
+    public Task<InventoryItem?> GetInventoryItemAsync([ID] int id, AppDbContext context) =>
+        context.InventoryItems.FirstOrDefaultAsync(i => i.Id == id);
 
     /// <summary>
     /// Returns the JSON Schema for a given entity type using NJsonSchema.
@@ -44,7 +57,6 @@ public class Query
         if (type == null) return "{}";
 
         var schema = JsonSchema.FromType(type, SchemaController.Settings);
-        SchemaController.ProcessCustomMetadata(schema, type);
         
         return schema.ToJson();
     }
