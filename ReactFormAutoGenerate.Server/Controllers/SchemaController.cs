@@ -42,11 +42,29 @@ public class SchemaController : ControllerBase
                         jsonProp.ExtensionData["x-identity"] = true;
                     }
 
-                    // Add x-relation for foreign key fields (convention: EntityId)
-                    if (prop.Name.Length > 2 && prop.Name.EndsWith("Id"))
+                    // Add x-relation for foreign key fields
+                    var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
+                    string? entityBaseName = null;
+
+                    if (fkAttr != null)
                     {
-                        var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
-                        var entityBaseName = fkAttr?.Name ?? prop.Name.Substring(0, prop.Name.Length - 2);
+                        // ForeignKey attribute is on the ID property itself, pointing to the navigation property name
+                        entityBaseName = fkAttr.Name;
+                    }
+                    else
+                    {
+                        // Check if there's a navigation property that has a [ForeignKey] attribute pointing to this property
+                        var navigationProp = context.ContextualType.Type.GetProperties()
+                            .FirstOrDefault(p => p.GetCustomAttribute<ForeignKeyAttribute>()?.Name == prop.Name);
+
+                        if (navigationProp != null)
+                        {
+                            entityBaseName = navigationProp.Name;
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(entityBaseName))
+                    {
                         jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
                     }
                 }

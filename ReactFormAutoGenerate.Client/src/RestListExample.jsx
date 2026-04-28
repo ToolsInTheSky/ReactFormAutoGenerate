@@ -12,6 +12,17 @@ import AutoListView from './components/autolist/AutoListView';
  * @description Renders a centralized product list view integrated with a RESTful backend.
  */
 export const RestListExample = () => {
+    const handleRefresh = () => {
+        console.log("Refreshing REST list...");
+        // In a real scenario, you could use a key to force re-mount or a ref to call internal refresh
+        window.location.reload(); // Simple refresh for now to demonstrate it's called
+    };
+
+    const handleCreate = () => {
+        console.log("Creating new REST item...");
+        alert("Create button clicked!");
+    };
+
     return (
         <div style={{ padding: '20px' }}>
             <h2 style={{ marginBottom: '20px' }}>REST + Kendo ListView (Products)</h2>
@@ -22,6 +33,8 @@ export const RestListExample = () => {
                     protocol="rest" 
                     resource="products" 
                     title="Product Catalog (REST)" 
+                    onRefresh={handleRefresh}
+                    onCreate={handleCreate}
                 />
             </div>
         </div>

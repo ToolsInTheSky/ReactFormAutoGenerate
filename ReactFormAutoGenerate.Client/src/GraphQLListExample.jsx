@@ -12,6 +12,16 @@ import AutoListView from './components/autolist/AutoListView';
  * @description Renders a centralized product list view integrated with a GraphQL backend.
  */
 export const GraphQLListExample = () => {
+    const handleRefresh = () => {
+        console.log("Refreshing GraphQL list...");
+        window.location.reload(); 
+    };
+
+    const handleCreate = () => {
+        console.log("Creating new GraphQL item...");
+        alert("Create button clicked!");
+    };
+
     return (
         <div style={{ padding: '20px' }}>
             <h2 style={{ marginBottom: '20px' }}>GraphQL + Kendo ListView (Products)</h2>
@@ -22,6 +32,8 @@ export const GraphQLListExample = () => {
                     protocol="graphql" 
                     entityName="Product" 
                     title="Product Catalog (GraphQL)" 
+                    onRefresh={handleRefresh}
+                    onCreate={handleCreate}
                 />
             </div>
         </div>

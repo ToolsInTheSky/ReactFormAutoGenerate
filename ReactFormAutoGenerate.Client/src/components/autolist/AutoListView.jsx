@@ -11,6 +11,8 @@ import { ListView, ListViewHeader } from '@progress/kendo-react-listview';
 import { Pager } from '@progress/kendo-react-data-tools';
 import { process } from '@progress/kendo-data-query';
 import { Loader } from "@progress/kendo-react-indicators";
+import { Button } from "@progress/kendo-react-buttons";
+import { arrowRotateCwIcon, plusIcon } from "@progress/kendo-svg-icons";
 import axios from 'axios';
 import { GraphQLClient, gql } from 'graphql-request';
 import pluralize from 'pluralize';
@@ -30,7 +32,7 @@ const getVal = (obj, key) => {
   return undefined;
 };
 
-const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowClick }) => {
+const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowClick, onRefresh, onCreate }) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState({ skip: 0, take: 10 });
@@ -194,6 +196,36 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
 
     return (
         <div style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
+            {/* Toolbar for Actions */}
+            {(onRefresh || onCreate) && (
+                <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'flex-end', 
+                    padding: '10px 15px', 
+                    gap: '10px',
+                    borderBottom: '1px solid #eee',
+                    backgroundColor: '#f9f9f9'
+                }}>
+                    {onRefresh && (
+                        <Button 
+                            svgIcon={arrowRotateCwIcon} 
+                            onClick={onRefresh}
+                        >
+                            Refresh
+                        </Button>
+                    )}
+                    {onCreate && (
+                        <Button 
+                            svgIcon={plusIcon} 
+                            onClick={onCreate}
+                            themeColor="primary"
+                        >
+                            Create
+                        </Button>
+                    )}
+                </div>
+            )}
+
             {/* Custom Header Row */}
             <ListViewHeader style={{ 
                 ...gridStyle, 
@@ -219,6 +251,19 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
                 item={GridRowRender}
                 style={{ width: '100%', minHeight: '400px' }}
             />
+
+            {data.length === 0 && (
+                <div style={{ 
+                    padding: '60px 20px', 
+                    textAlign: 'center', 
+                    color: '#888',
+                    backgroundColor: '#fff',
+                    borderBottom: '1px solid #eee'
+                }}>
+                    <div style={{ fontSize: '1.2rem', marginBottom: '10px' }}>No records found</div>
+                    <div style={{ fontSize: '0.9rem' }}>There is no data to display for this resource.</div>
+                </div>
+            )}
 
             <Pager
                 skip={page.skip}
