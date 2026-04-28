@@ -106,6 +106,11 @@ const RjsfEntityManager = ({ protocol = "rest", resource, entityName, schemaKey 
         .map(key => toCamelCase(key))
         .join("\n");
     const queryName = toPluralCamelCase(entityName);
+    const isKeyless = schema["x-keyless"] === true || schema["xKeyless"] === true;
+    
+    if (isKeyless) {
+        return `query { ${queryName} { items { ${fields} } } }`;
+    }
     return `query { ${queryName} { items { id ${fields} } totalCount } }`;
   }, [schema, entityName, isRest]);
 

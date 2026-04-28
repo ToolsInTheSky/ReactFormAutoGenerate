@@ -1,5 +1,6 @@
 using HotChocolate;
 using HotChocolate.Data;
+using Microsoft.EntityFrameworkCore;
 using ReactFormAutoGenerate.Server.Data;
 using ReactFormAutoGenerate.Server.Entities;
 
@@ -149,5 +150,26 @@ public class Mutation
         context.InventoryItems.Remove(item);
         await context.SaveChangesAsync();
         return item;
+    }
+
+    // --- ProductLog Mutations (Keyless) ---
+
+    public record CreateProductLogInput(int ProductId, string Activity, string? PerformedBy, DateTime? LogDate);
+    public record CreateOneProductLogInput(CreateProductLogInput ProductLog);
+
+    public async Task<ProductLog> CreateOneProductLogAsync(
+        CreateOneProductLogInput input, [Service] IDbContextFactory<AppDbContext> contextFactory)
+    {
+        using var context = contextFactory.CreateDbContext();
+        var log = new ProductLog 
+        { 
+            ProductId = input.ProductLog.ProductId, 
+            Activity = input.ProductLog.Activity, 
+            PerformedBy = input.ProductLog.PerformedBy,
+            LogDate = input.ProductLog.LogDate ?? DateTime.UtcNow
+        };
+        context.ProductLogs.Add(log);
+        await context.SaveChangesAsync();
+        return log;
     }
 }

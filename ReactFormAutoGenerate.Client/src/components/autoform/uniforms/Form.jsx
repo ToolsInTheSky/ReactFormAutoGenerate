@@ -22,6 +22,11 @@ import { TextField, NumberField, SelectField, BoolField, DateField, SubmitField,
 
 const ajv = new Ajv({ allErrors: true, useDefaults: true, strict: false });
 addFormats(ajv);
+// Register custom 'decimal' format as a number to avoid warnings
+ajv.addFormat('decimal', {
+    type: 'number',
+    validate: (x) => !isNaN(Number(x))
+});
 
 const toCamelCase = (str) => str.charAt(0).toLowerCase() + str.slice(1);
 const toPascalCase = (str) => str.charAt(0).toUpperCase() + str.slice(1);
@@ -142,12 +147,29 @@ const UniformAutoForm = ({
     const actualResource = isRest ? resource : toCamelCase(pluralize(entityName || ""));
     const dataProviderName = isRest ? "default" : "graphql";
 
+    // section: Keyless Meta Handling
+    const meta = useMemo(() => {
+        const isKeyless = schema && (schema["x-keyless"] === true || schema["xKeyless"] === true);
+        if (isRest || !isKeyless || !schema?.properties) return undefined;
+        
+        // Request the virtual ID now that it's available on the entity
+        const fields = Object.keys(schema.properties).map(toCamelCase);
+        fields.push("id");
+        
+        return { fields };
+    }, [isRest, schema]);
+
     // section: Refine Integration
+    // Optimization: Rely on initialRecord prop instead of fetching from server
     const { onFinish, queryResult, formLoading } = useForm({
         action,
         resource: actualResource,
         id,
         dataProviderName,
+        meta,
+        queryOptions: {
+            enabled: false, // Stop automatic GetOne fetch
+        },
         onMutationSuccess: () => {
             onSuccess?.();
             onCancel();
@@ -247,6 +269,7 @@ const UniformAutoForm = ({
             payload[mappedKey] = formData[key];
         });
         if (isRest && id) payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
+        
         onFinish(payload);
     };
 

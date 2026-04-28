@@ -68,6 +68,17 @@ export const GraphQLRjsfExample = () => {
           </div>
         </TabStripTab>
 
+        {/* Section: Product Logs (GraphQL) */}
+        <TabStripTab title="Logs">
+          <div style={{ marginTop: '20px' }}>
+            <RjsfEntityManager 
+              protocol="graphql"
+              resource="productlogs" 
+              entityName="ProductLog" 
+            />
+          </div>
+        </TabStripTab>
+
       </TabStrip>
     </div>
   );

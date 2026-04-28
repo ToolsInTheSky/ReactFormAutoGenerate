@@ -89,8 +89,8 @@ const AutoGrid = ({
       const prop = schema.properties[key];
       const lowerKey = key.toLowerCase();
       
-      // Filter 1: Skip primary ID fields
-      if (lowerKey === "id" || prop["x-identity"]) return false;
+      // Filter 1: Skip primary ID fields (unless keyless)
+      if (!schema["x-keyless"] && (lowerKey === "id" || prop["x-identity"])) return false;
       
       // Filter 2: Detect complex nested types (objects/arrays)
       const isComplex = prop.type === "object" || 
@@ -111,6 +111,18 @@ const AutoGrid = ({
     return <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
   }
 
+  const handleRowClick = (e) => {
+    let idValue = null;
+    if (schema["x-keyless"]) {
+        const identityFields = schema["x-identity-fields"] || [];
+        idValue = identityFields.map(f => getVal(e.dataItem, f)).join('|');
+    } else {
+        const idKey = Object.keys(schema.properties).find(k => schema.properties[k]["x-identity"]) || "id";
+        idValue = getVal(e.dataItem, idKey);
+    }
+    onRowClick(idValue, e.dataItem);
+  };
+
   return (
     <div className="auto-grid-wrapper">
       {/* Grid Toolbar */}
@@ -129,12 +141,20 @@ const AutoGrid = ({
         sortable={true}
         sort={sort}
         onSortChange={(e) => setSort(e.sort)}
-        onRowClick={(e) => {
-          const idKey = Object.keys(schema.properties).find(k => schema.properties[k]["x-identity"]) || "id";
-          onRowClick(getVal(e.dataItem, idKey), e.dataItem);
-      }}>
+        onRowClick={handleRowClick}>
         {/* Fixed ID Column */}
-        <GridColumn field="id" title="ID" width="80px" cell={(props) => <td {...props.tdProps}>{getVal(props.dataItem, "id")}</td>} />
+        <GridColumn 
+            field="id" 
+            title="ID" 
+            width="120px" 
+            cell={(props) => {
+                const item = props.dataItem;
+                const isKeyless = schema["x-keyless"];
+                const displayId = isKeyless ? `IDX:${data.indexOf(item) + 1}` : `#${getVal(item, "id")}`;
+                const titleId = isKeyless ? (schema["x-identity-fields"] || []).map(f => getVal(item, f)).join('|') : getVal(item, "id");
+                return <td {...props.tdProps} title={titleId}>{displayId}</td>;
+            }} 
+        />
         
         {/* Dynamically Generated Columns */}
         {columns.map(col => {

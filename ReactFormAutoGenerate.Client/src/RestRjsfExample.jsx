@@ -69,6 +69,18 @@ export const RestRjsfExample = () => {
             />
           </div>
         </TabStripTab>
+
+        {/* Tab 4: Product Logs (Keyless) */}
+        <TabStripTab title="Logs">
+          <div style={{ marginTop: '20px' }}>
+            <RjsfEntityManager 
+              protocol="rest"
+              resource="productlogs" 
+              schemaKey="productlog" 
+              entityName="ProductLog"
+            />
+          </div>
+        </TabStripTab>
         
       </TabStrip>
     </div>

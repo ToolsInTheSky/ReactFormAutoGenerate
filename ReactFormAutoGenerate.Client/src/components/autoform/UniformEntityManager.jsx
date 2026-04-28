@@ -92,7 +92,9 @@ export const UniformEntityManager = ({ protocol = "rest", resource, entityName, 
                     })
                     .map(toCamelCase).join("\n");
                 const qName = toPluralCamelCase(entityName);
-                const query = `query { ${qName} { items { id ${fields} } } }`;
+                const isKeyless = schema["x-keyless"] === true || schema["xKeyless"] === true;
+                const idField = isKeyless ? "" : "id";
+                const query = `query { ${qName} { items { ${idField} ${fields} } } }`;
                 const res = await axios.post("/graphql", { query });
                 setRecords(res.data?.data?.[qName]?.items || []);
             } catch (err) { console.error(err); }

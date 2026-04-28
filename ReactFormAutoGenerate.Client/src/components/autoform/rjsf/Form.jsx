@@ -104,13 +104,30 @@ const RjsfAutoForm = ({
     return options;
   }, [relQueriesResults, relations]);
 
+  // section: Keyless Meta Handling
+  const meta = useMemo(() => {
+    const isKeyless = schema && (schema["x-keyless"] === true || schema["xKeyless"] === true);
+    if (isRest || !isKeyless || !schema?.properties) return undefined;
+    
+    // Now that we have a virtual Id property, we can include it in the GraphQL query
+    const fields = Object.keys(schema.properties).map(toCamelCase);
+    fields.push("id"); // Request the virtual ID
+    
+    return { fields };
+  }, [isRest, schema]);
+
   // section 2: Refine useForm Integration
   // !!! IMPORTANT: dataProviderName must be at the top level of options !!!
+  // Optimization: Disable automatic GetOne query since we already have the record prop
   const { onFinish, queryResult, formLoading } = useForm({
     action,
     resource: actualResource,
     id,
     dataProviderName,
+    meta,
+    queryOptions: {
+      enabled: false, // Don't fetch single item from server
+    },
     onMutationSuccess: () => {
       if (isRest) {
         queryClient.invalidateQueries({ queryKey: [resource] });
@@ -280,6 +297,7 @@ const RjsfAutoForm = ({
                 payload[mappedKey] = formData[key];
             });
             if (isRest && id) payload["Id"] = typeof id === 'string' ? parseInt(id, 10) : id;
+            
             onFinish(payload);
         }}
       >

@@ -42,7 +42,7 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
     const isRest = protocol === "rest";
     const client = useMemo(() => isRest ? null : new GraphQLClient(window.location.origin + "/graphql"), [isRest]);
 
-    const toPluralCamelCase = (name) => toCamelCase(pluralize(name));
+    const toPluralCamelCase = useCallback((name) => toCamelCase(pluralize(name)), []);
 
     /**
      * section: Schema, Data, and Lookups Fetching
@@ -105,16 +105,20 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
                     .map(toCamelCase).join("\n");
 
                 const qName = toPluralCamelCase(entityName);
-                const dataQuery = `query { ${qName} { items { id ${queryFields} } } }`;
+                // Check for x-keyless or xKeyless depending on how it's serialized
+                const isKeyless = parsedSchema["x-keyless"] === true || parsedSchema["xKeyless"] === true;
+                const idField = isKeyless ? "" : "id";
+                
+                const dataQuery = `query { ${qName} { items { ${idField} ${queryFields} } } }`;
                 const res = await axios.post("/graphql", { query: dataQuery });
                 setData(res.data?.data?.[qName]?.items || []);
             }
         } catch (err) {
-            console.error("Error in AutoListView:", err);
+            console.error("Error in AutoListView fetchAll:", err);
         } finally {
             setLoading(false);
         }
-    }, [isRest, resource, entityName, client]);
+    }, [isRest, resource, entityName, client, toPluralCamelCase]);
 
     useEffect(() => {
         fetchAll();
@@ -125,7 +129,9 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
         return Object.keys(schema.properties).filter(key => {
             const prop = schema.properties[key];
             const lowerKey = key.toLowerCase();
-            if (lowerKey === "id" || prop["x-identity"]) return false;
+            // In keyless mode, we don't skip "id" if it's just a regular column
+            if (!schema["x-keyless"] && (lowerKey === "id" || prop["x-identity"])) return false;
+            
             const isComplex = prop.type === "object" || prop.type === "array" || prop.$ref || prop.oneOf || prop.anyOf;
             return !isComplex || !!prop["x-relation"];
         });
@@ -133,7 +139,7 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
 
     const gridStyle = {
         display: 'grid',
-        gridTemplateColumns: `80px repeat(${columns.length}, 1fr)`,
+        gridTemplateColumns: `120px repeat(${columns.length}, 1fr)`,
         gap: '10px',
         alignItems: 'center'
     };
@@ -143,7 +149,18 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
      */
     const GridRowRender = (props) => {
         const item = props.dataItem;
-        const id = getVal(item, "id");
+        
+        let displayId = "";
+        let idValue = null;
+
+        if (schema["x-keyless"]) {
+            const identityFields = schema["x-identity-fields"] || [];
+            idValue = identityFields.map(f => getVal(item, f)).join('|');
+            displayId = `IDX:${props.itemIndex + 1}`;
+        } else {
+            idValue = getVal(item, "id");
+            displayId = `#${idValue}`;
+        }
 
         return (
             <div 
@@ -155,9 +172,9 @@ const AutoListView = ({ protocol = "rest", resource, entityName, title, onRowCli
                     cursor: onRowClick ? 'pointer' : 'default',
                     transition: 'background-color 0.2s'
                 }}
-                onClick={() => onRowClick?.(id, item)}
+                onClick={() => onRowClick?.(idValue, item)}
             >
-                <div style={{ fontWeight: 'bold', color: '#666' }}>#{id}</div>
+                <div style={{ fontWeight: 'bold', color: '#666', fontSize: '0.85rem' }} title={idValue}>{displayId}</div>
                 {columns.map(col => {
                     const prop = schema.properties[col];
                     const val = getVal(item, col);

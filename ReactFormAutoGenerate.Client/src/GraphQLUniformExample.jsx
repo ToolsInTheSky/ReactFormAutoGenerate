@@ -65,6 +65,16 @@ export const GraphQLUniformExample = () => {
                     </div>
                 </TabStripTab>
 
+                {/* Section: Product Logs (GraphQL) */}
+                <TabStripTab title="Logs">
+                    <div style={{ marginTop: '20px' }}>
+                        <UniformEntityManager 
+                            protocol="graphql"
+                            entityName="ProductLog"
+                        />
+                    </div>
+                </TabStripTab>
+
             </TabStrip>
         </div>
     );

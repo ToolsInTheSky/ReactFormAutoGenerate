@@ -19,7 +19,8 @@ builder.Services
     .RegisterDbContextFactory<AppDbContext>()
     .AddProjections()
     .AddFiltering()
-    .AddSorting();
+    .AddSorting()
+    .ModifyRequestOptions(opt => opt.IncludeExceptionDetails = builder.Environment.IsDevelopment());
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -76,6 +77,17 @@ using (var scope = app.Services.CreateScope())
                 Price = 45.00m, 
                 CategoryId = books.Id 
             });
+            context.SaveChanges();
+        }
+
+        if (!context.ProductLogs.Any())
+        {
+            var smartphone = context.Products.FirstOrDefault(p => p.Name == "Smartphone");
+            if (smartphone != null)
+            {
+                context.ProductLogs.Add(new ProductLog { ProductId = smartphone.Id, Activity = "Initial import", PerformedBy = "System" });
+                context.ProductLogs.Add(new ProductLog { ProductId = smartphone.Id, Activity = "Price set", PerformedBy = "Admin" });
+            }
             context.SaveChanges();
         }
     }

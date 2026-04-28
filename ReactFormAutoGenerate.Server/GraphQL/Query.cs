@@ -44,6 +44,36 @@ public class Query
     public Task<InventoryItem?> GetInventoryItemAsync([ID] int id, AppDbContext context) =>
         context.InventoryItems.FirstOrDefaultAsync(i => i.Id == id);
 
+    [UseProjection]
+    public async Task<ProductLog?> GetProductLogAsync([GraphQLType(typeof(IdType))] string id, AppDbContext context)
+    {
+        var parts = id.Split('|');
+        if (parts.Length < 3) return null;
+
+        if (!int.TryParse(parts[0], out int productId)) return null;
+        string activity = parts[1];
+        if (!DateTime.TryParse(parts[2], out DateTime logDate)) return null;
+        
+        // Ensure UTC kind for PostgreSQL
+        logDate = DateTime.SpecifyKind(logDate, DateTimeKind.Utc);
+        
+        string performedBy = parts.Length > 3 ? parts[3] : string.Empty;
+
+        // Find by composite key components
+        return await context.ProductLogs.FirstOrDefaultAsync(p =>
+            p.ProductId == productId &&
+            p.Activity == activity &&
+            p.LogDate == logDate &&
+            (p.PerformedBy ?? string.Empty) == (performedBy ?? string.Empty));
+    }
+
+    [UseOffsetPaging(IncludeTotalCount = true)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<ProductLog> GetProductLogs(AppDbContext context) =>
+        context.ProductLogs;
+
     /// <summary>
     /// Returns the JSON Schema for a given entity type using NJsonSchema.
     /// protocol parameter is now ignored as we use a unified schema.

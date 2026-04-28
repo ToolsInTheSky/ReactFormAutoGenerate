@@ -71,6 +71,18 @@ export const RestUniformExample = () => {
                     </div>
                 </TabStripTab>
 
+                {/* Section: Product Logs (Keyless) */}
+                <TabStripTab title="Logs">
+                    <div style={{ marginTop: '20px' }}>
+                        <UniformEntityManager 
+                            protocol="rest"
+                            resource="productlogs"
+                            title="Product Log"
+                            schemaUrl="/api/schema/productlog"
+                        />
+                    </div>
+                </TabStripTab>
+
             </TabStrip>
         </div>
     );

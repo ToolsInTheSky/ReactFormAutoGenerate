@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using ReactFormAutoGenerate.Server.Data;
@@ -11,9 +12,11 @@ using ReactFormAutoGenerate.Server.Data;
 namespace ReactFormAutoGenerate.Server.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260428020225_AddProductLog")]
+    partial class AddProductLog
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -110,10 +113,8 @@ namespace ReactFormAutoGenerate.Server.Migrations
 
             modelBuilder.Entity("ReactFormAutoGenerate.Server.Entities.ProductLog", b =>
                 {
-                    b.Property<int>("ProductId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Activity")
+                        .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
@@ -124,7 +125,8 @@ namespace ReactFormAutoGenerate.Server.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.HasKey("ProductId", "Activity", "LogDate", "PerformedBy");
+                    b.Property<int>("ProductId")
+                        .HasColumnType("integer");
 
                     b.ToTable("ProductLogs", "reactform_schema");
                 });

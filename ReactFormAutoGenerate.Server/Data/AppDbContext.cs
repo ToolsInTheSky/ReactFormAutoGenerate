@@ -12,10 +12,15 @@ public class AppDbContext : DbContext
     public DbSet<Category> Categories { get; set; }
     public DbSet<Product> Products { get; set; }
     public DbSet<InventoryItem> InventoryItems { get; set; }
+    public DbSet<ProductLog> ProductLogs { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Configure ProductLog with a Composite Key (all fields) to allow tracking and insertion
+        modelBuilder.Entity<ProductLog>()
+            .HasKey(p => new { p.ProductId, p.Activity, p.LogDate, p.PerformedBy });
 
         // Set default schema
         modelBuilder.HasDefaultSchema("reactform_schema");

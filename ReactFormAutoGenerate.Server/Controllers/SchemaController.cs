@@ -29,7 +29,10 @@ public class SchemaController : ControllerBase
         {
             if (context.Schema.Properties == null) return;
 
-            foreach (var prop in context.ContextualType.Type.GetProperties())
+            var allProps = context.ContextualType.Type.GetProperties();
+            bool hasIdentity = false;
+
+            foreach (var prop in allProps)
             {
                 if (context.Schema.Properties.TryGetValue(prop.Name, out var jsonProp))
                 {
@@ -40,34 +43,50 @@ public class SchemaController : ControllerBase
                         string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase))
                     {
                         jsonProp.ExtensionData["x-identity"] = true;
+                        hasIdentity = true;
                     }
 
                     // Add x-relation for foreign key fields
                     var fkAttr = prop.GetCustomAttribute<ForeignKeyAttribute>();
                     string? entityBaseName = null;
 
-                    if (fkAttr != null)
-                    {
-                        // ForeignKey attribute is on the ID property itself, pointing to the navigation property name
-                        entityBaseName = fkAttr.Name;
-                    }
-                    else
-                    {
-                        // Check if there's a navigation property that has a [ForeignKey] attribute pointing to this property
-                        var navigationProp = context.ContextualType.Type.GetProperties()
-                            .FirstOrDefault(p => p.GetCustomAttribute<ForeignKeyAttribute>()?.Name == prop.Name);
+                    // Ensure we only apply x-relation to simple ID properties, not navigation objects
+                    bool isSimpleType = prop.PropertyType.IsPrimitive || 
+                                       prop.PropertyType == typeof(int) || 
+                                       prop.PropertyType == typeof(long) || 
+                                       prop.PropertyType == typeof(string) || 
+                                       prop.PropertyType == typeof(decimal) ||
+                                       Nullable.GetUnderlyingType(prop.PropertyType) != null;
 
-                        if (navigationProp != null)
+                    if (isSimpleType)
+                    {
+                        if (fkAttr != null)
                         {
-                            entityBaseName = navigationProp.Name;
+                            entityBaseName = fkAttr.Name;
+                        }
+                        else
+                        {
+                            var navigationProp = allProps.FirstOrDefault(p => p.GetCustomAttribute<ForeignKeyAttribute>()?.Name == prop.Name);
+                            if (navigationProp != null)
+                            {
+                                entityBaseName = navigationProp.Name;
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(entityBaseName))
+                        {
+                            jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
                         }
                     }
-
-                    if (!string.IsNullOrEmpty(entityBaseName))
-                    {
-                        jsonProp.ExtensionData["x-relation"] = entityBaseName.Pluralize().ToLower();
-                    }
                 }
+            }
+
+            // If no single identity property was found, mark as keyless and provide all fields as composite identity
+            if (!hasIdentity)
+            {
+                if (context.Schema.ExtensionData == null) context.Schema.ExtensionData = new Dictionary<string, object?>();
+                context.Schema.ExtensionData["x-keyless"] = true;
+                context.Schema.ExtensionData["x-identity-fields"] = allProps.Select(p => p.Name).ToList();
             }
         }
     }
@@ -75,12 +94,14 @@ public class SchemaController : ControllerBase
     [HttpGet("all")]
     public IActionResult GetAllSchemas()
     {
-        var entities = new[] { typeof(Category), typeof(Product), typeof(InventoryItem) };
+        var entities = new[] { typeof(Category), typeof(Product), typeof(InventoryItem), typeof(ProductLog) };
         var schemas = new Dictionary<string, object>();
 
         foreach (var type in entities)
         {
             var schema = JsonSchema.FromType(type, Settings);
+            schema.Id = null; // Fix: Remove root 'id' to avoid AJV 8+ errors
+            
             // Serialize to string and back to object to avoid JObject/System.Text.Json conflict
             var schemaJson = schema.ToJson();
             schemas[type.Name] = System.Text.Json.JsonSerializer.Deserialize<object>(schemaJson)!;
@@ -97,6 +118,7 @@ public class SchemaController : ControllerBase
         if (type == null) return NotFound($"Entity '{name}' not found.");
 
         var schema = JsonSchema.FromType(type, Settings);
+        schema.Id = null; // Fix: Remove root 'id'
         
         return Content(schema.ToJson(), "application/json");
     }
