@@ -50,43 +50,54 @@ using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+    // Ensure Categories exist
     if (!context.Categories.Any())
     {
-        var electronics = new Category { Name = "Electronics" };
-        var books = new Category { Name = "Books" };
-        context.Categories.AddRange(electronics, books);
+        context.Categories.AddRange(
+            new Category { Name = "Electronics" },
+            new Category { Name = "Books" }
+        );
         context.SaveChanges();
+    }
 
-        if (!context.Products.Any())
+    var electronics = context.Categories.FirstOrDefault(c => c.Name == "Electronics");
+    var books = context.Categories.FirstOrDefault(c => c.Name == "Books");
+
+    // Ensure Products exist (at least 50 for paging tests)
+    if (electronics != null && books != null)
+    {
+        var productCount = context.Products.Count();
+        if (productCount < 50)
         {
-            context.Products.Add(new Product
+            for (int i = productCount + 1; i <= 50; i++)
             {
-                Name = "Smartphone",
-                Price = 699.99m,
-                CategoryId = electronics.Id
-            });
-            context.Products.Add(new Product
-            {
-                Name = "Laptop",
-                Price = 1299.99m,
-                CategoryId = electronics.Id
-            });
-            context.Products.Add(new Product
-            {
-                Name = "C# in Depth",
-                Price = 45.00m,
-                CategoryId = books.Id
-            });
+                context.Products.Add(new Product
+                {
+                    Name = $"Product {i}",
+                    Price = 10.00m + i,
+                    CategoryId = (i % 2 == 0) ? electronics.Id : books.Id
+                });
+            }
             context.SaveChanges();
         }
+    }
 
-        if (!context.ProductLogs.Any())
+    // Ensure ProductLogs exist (at least 30)
+    var logCount = context.ProductLogs.Count();
+    if (logCount < 30)
+    {
+        var firstProduct = context.Products.FirstOrDefault();
+        if (firstProduct != null)
         {
-            var smartphone = context.Products.FirstOrDefault(p => p.Name == "Smartphone");
-            if (smartphone != null)
+            for (int i = logCount + 1; i <= 30; i++)
             {
-                context.ProductLogs.Add(new ProductLog { ProductId = smartphone.Id, Activity = "Initial import", PerformedBy = "System" });
-                context.ProductLogs.Add(new ProductLog { ProductId = smartphone.Id, Activity = "Price set", PerformedBy = "Admin" });
+                context.ProductLogs.Add(new ProductLog 
+                { 
+                    ProductId = firstProduct.Id, 
+                    Activity = $"Automated activity log {i}", 
+                    PerformedBy = (i % 3 == 0) ? "System" : "Admin",
+                    LogDate = DateTime.UtcNow.AddMinutes(-i)
+                });
             }
             context.SaveChanges();
         }

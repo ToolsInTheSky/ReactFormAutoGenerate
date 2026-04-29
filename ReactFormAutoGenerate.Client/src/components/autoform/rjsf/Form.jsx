@@ -217,6 +217,8 @@ const RjsfAutoForm = ({
 				if (prop.type === "number" || prop.type === "integer") {
 					data[key] =
 						val === "" || val === undefined || val === null ? 0 : Number(val);
+				} else if (prop.type === "boolean") {
+					data[key] = val === true || val === "true" || val === "Yes";
 				} else {
 					data[key] = val ?? "";
 				}

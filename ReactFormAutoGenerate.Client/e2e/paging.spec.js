@@ -2,7 +2,9 @@ import { test, expect } from '@playwright/test';
 
 const listPages = [
   { name: 'REST List', url: '/rest-list-example' },
+  { name: 'REST Keyless List', url: '/rest-keyless-example' },
   { name: 'GraphQL List', url: '/graphql-list-example' },
+  { name: 'GraphQL Keyless List', url: '/graphql-keyless-example' },
 ];
 
 for (const listPage of listPages) {
@@ -10,8 +12,11 @@ for (const listPage of listPages) {
     test.beforeEach(async ({ page }) => {
       test.setTimeout(90000);
       await page.goto(listPage.url);
-      await page.waitForTimeout(5000);
-      await page.waitForSelector('.k-listview, .autolist-row', { timeout: 30000 });
+      await page.waitForLoadState('networkidle');
+      
+      // Wait for the grid/listview to appear
+      const listview = page.locator('.k-listview, .autolist-row').first();
+      await expect(listview).toBeVisible({ timeout: 30000 });
     });
 
     test('should navigate through pages', async ({ page }) => {
@@ -24,36 +29,36 @@ for (const listPage of listPages) {
       const initialText = await firstItem.innerText();
 
       // Click next page - more robust selector for Kendo Next Page button
-      const nextBtn = page.locator('.k-pager-nav').filter({ has: page.locator('.k-i-caret-alt-right, .k-svg-i-caret-alt-right') }).or(page.locator('.k-pager-next'));
+      // Use the button with aria-label="Go to the next page"
+      const nextBtn = page.getByRole('button', { name: /next page/i }).or(page.locator('.k-pager-nav.k-pager-next'));
       await nextBtn.first().click();
       
-      await page.waitForTimeout(2000);
-
-      // Verify item changed
-      const nextPageItem = page.locator('.autolist-row').first();
-      await expect(nextPageItem).not.toHaveText(initialText, { timeout: 10000 });
+      // Wait for data to update (initial text should disappear or change)
+      await expect(page.locator('.autolist-row').first()).not.toHaveText(initialText, { timeout: 15000 });
     });
 
     test('should change page size', async ({ page }) => {
       // Find page size dropdown
-      const select = page.locator('.k-pager-sizes select');
       const kendoDropdown = page.locator('.k-pager-sizes .k-dropdownlist');
       
-      if (await select.count() > 0) {
-        await select.selectOption('20');
-      } else if (await kendoDropdown.count() > 0) {
-        // Kendo DropDownList replacement for native select
+      if (await kendoDropdown.isVisible()) {
         await kendoDropdown.click();
-        await page.locator('.k-list-item:has-text("20")').click();
+        // Wait for the popup and select 20
+        const option = page.locator('.k-animation-container .k-list-item').filter({ hasText: /^20$/ });
+        await option.click();
+      } else {
+        const select = page.locator('.k-pager-sizes select');
+        if (await select.isVisible()) {
+            await select.selectOption('20');
+        }
       }
       
+      // Wait for data to refresh
       await page.waitForTimeout(2000);
 
       // Verify more items are shown
       const rows = page.locator('.autolist-row');
-      const count = await rows.count();
-      // We seeded 50/150 items, so changing to 20 should show more than 10
-      expect(count).toBeGreaterThan(10);
+      await expect(rows).toHaveCount(20, { timeout: 10000 });
     });
   });
 }

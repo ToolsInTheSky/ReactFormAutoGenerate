@@ -111,7 +111,9 @@ class RobustCustomBridge extends Bridge {
 		const field = this.getField(name);
 		if (this.overrides[name]?.options?.length > 0)
 			return this.overrides[name].options[0].value;
-		return field?.type === "integer" || field?.type === "number" ? 0 : "";
+		if (field?.type === "integer" || field?.type === "number") return 0;
+		if (field?.type === "boolean") return false;
+		return "";
 	}
 
 	getProps(name) {
@@ -156,6 +158,8 @@ class RobustCustomBridge extends Bridge {
 		const field = this.getField(name);
 		if (field?.type === "integer" || field?.type === "number") return Number;
 		if (field?.type === "boolean") return Boolean;
+		if (field?.type === "array") return Array;
+		if (field?.type === "object") return Object;
 		return String;
 	}
 

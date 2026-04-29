@@ -40,6 +40,13 @@ yarn.lock
 ## [Vite]
 *.log
 
+## [Playwright]
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/.auth/
+**/playwright/.cache/
+
 ## [OS]
 Thumbs.db
 Desktop.ini
