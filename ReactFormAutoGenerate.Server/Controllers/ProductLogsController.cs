@@ -7,8 +7,7 @@ using ReactFormAutoGenerate.Server.Entities;
 namespace ReactFormAutoGenerate.Server.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-[Route("api/productlogs")] // Explicit lowercase route
+[Route("api/productlogs")]
 public class ProductLogsController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -101,6 +100,19 @@ public class ProductLogsController : ControllerBase
         return await _context.ProductLogs.ToListAsync();
     }
 
+    [HttpGet("page")]
+    public async Task<ActionResult<object>> GetPagedProductLogs([FromQuery] int skip = 0, [FromQuery] int take = 10)
+    {
+        var totalCount = await _context.ProductLogs.CountAsync();
+        var items = await _context.ProductLogs
+            .OrderByDescending(p => p.LogDate)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return new { items, totalCount };
+    }
+
     // -------------------------------------------------------------------------
     // GET /api/productlogs          (x-id header required)
     // -------------------------------------------------------------------------
@@ -111,10 +123,15 @@ public class ProductLogsController : ControllerBase
         var (ok, error, productId, activity, logDate, performedBy) = ParseXId(xId);
         if (!ok) return BadRequest(error);
 
+        // Use a small 1ms window for DateTime comparison to handle precision issues
+        var minDate = logDate.AddMilliseconds(-1);
+        var maxDate = logDate.AddMilliseconds(1);
+
         var log = await _context.ProductLogs.FirstOrDefaultAsync(p =>
             p.ProductId == productId &&
             p.Activity == activity &&
-            p.LogDate == logDate &&
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
             p.PerformedBy == performedBy);
 
         if (log == null) return NotFound();
@@ -130,11 +147,15 @@ public class ProductLogsController : ControllerBase
         // Normalise LogDate to UTC for PostgreSQL
         productLog.LogDate = DateTime.SpecifyKind(productLog.LogDate, DateTimeKind.Utc);
 
-        // Check for duplicate composite key
+        // Check for duplicate composite key (also with tolerance)
+        var minDate = productLog.LogDate.AddMilliseconds(-1);
+        var maxDate = productLog.LogDate.AddMilliseconds(1);
+        
         bool exists = await _context.ProductLogs.AnyAsync(p =>
             p.ProductId == productLog.ProductId &&
             p.Activity == productLog.Activity &&
-            p.LogDate == productLog.LogDate &&
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
             p.PerformedBy == productLog.PerformedBy);
 
         if (exists)
@@ -166,11 +187,15 @@ public class ProductLogsController : ControllerBase
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
-            // Find the original record by parsed composite key
+            // Find the original record by parsed composite key (with tolerance)
+            var minDate = logDate.AddMilliseconds(-1);
+            var maxDate = logDate.AddMilliseconds(1);
+
             var existing = await _context.ProductLogs.FirstOrDefaultAsync(p =>
                 p.ProductId == productId &&
                 p.Activity == activity &&
-                p.LogDate == logDate &&
+                p.LogDate >= minDate &&
+                p.LogDate <= maxDate &&
                 p.PerformedBy == performedBy);
 
             if (existing == null)
@@ -194,9 +219,6 @@ public class ProductLogsController : ControllerBase
             else
             {
                 // Key unchanged — update any non-key columns in place.
-                // This is a no-op for ProductLog (all fields are key fields) but
-                // is kept here intentionally so this pattern generalises cleanly
-                // to other keyless tables that may have non-key columns.
                 _context.Entry(existing).CurrentValues.SetValues(updated);
                 await _context.SaveChangesAsync();
             }
@@ -222,10 +244,15 @@ public class ProductLogsController : ControllerBase
         var (ok, error, productId, activity, logDate, performedBy) = ParseXId(xId);
         if (!ok) return BadRequest(error);
 
+        // Find the record with tolerance
+        var minDate = logDate.AddMilliseconds(-1);
+        var maxDate = logDate.AddMilliseconds(1);
+
         var log = await _context.ProductLogs.FirstOrDefaultAsync(p =>
             p.ProductId == productId &&
             p.Activity == activity &&
-            p.LogDate == logDate &&
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
             p.PerformedBy == performedBy);
 
         if (log == null) return NotFound();

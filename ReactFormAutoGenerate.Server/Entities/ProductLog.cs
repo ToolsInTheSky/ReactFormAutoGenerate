@@ -21,4 +21,11 @@ public class ProductLog
     [Required]
     [MaxLength(100)]
     public string PerformedBy { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Virtual ID property for GraphQL/Client compatibility.
+    /// Concatenates composite key fields into a single pipe-delimited string.
+    /// </summary>
+    [NotMapped]
+    public string Id => $"{ProductId}|{Activity}|{LogDate:O}|{PerformedBy}";
 }

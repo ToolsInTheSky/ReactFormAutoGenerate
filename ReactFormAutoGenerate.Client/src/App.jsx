@@ -29,6 +29,7 @@ import { BrowserRouter, Link, Route, Routes } from "react-router-dom";
 import { createDataProvider } from "./components/autoform/refineDataProvider";
 import SchemaFetcher from "./components/autoform/SchemaFetcher";
 import { GraphQLListExample } from "./GraphQLListExample";
+import { GraphQLKeylessExample } from "./GraphQLKeylessExample";
 import { GraphQLRjsfExample } from "./GraphQLRjsfExample";
 import { GraphQLUniformExample } from "./GraphQLUniformExample";
 import { RestKeylessExample } from "./RestKeylessExample";
@@ -339,6 +340,29 @@ const HomePage = ({ currentTheme, onThemeChange }) => {
                         </Link>
                     </CardBody>
                 </Card>
+                <Card style={{ width: "280px" }}>
+                    <CardBody>
+                        <CardTitle>GraphQL Keyless List</CardTitle>
+                        <p
+                            style={{
+                                fontSize: "0.8rem",
+                                color: "#666",
+                                marginBottom: "20px",
+                            }}
+                        >
+                            Keyless Tables via GraphQL
+                        </p>
+                        <Link to="/graphql-keyless-example" style={{ textDecoration: "none" }}>
+                            <Button
+                                themeColor="secondary"
+                                fillMode="outline"
+                                style={{ width: "100%" }}
+                            >
+                                View Keyless (GQL)
+                            </Button>
+                        </Link>
+                    </CardBody>
+                </Card>
             </div>
         </div>
     );
@@ -464,6 +488,19 @@ function App() {
                                     </Button>
                                 </Link>
                                 <GraphQLListExample />
+                            </div>
+                        }
+                    />
+                    <Route
+                        path="/graphql-keyless-example"
+                        element={
+                            <div style={{ padding: "20px" }}>
+                                <Link to="/" style={{ textDecoration: "none" }}>
+                                    <Button fillMode="outline" style={{ marginBottom: "20px" }}>
+                                        <SvgIcon icon={arrowLeftIcon} /> Back
+                                    </Button>
+                                </Link>
+                                <GraphQLKeylessExample />
                             </div>
                         }
                     />

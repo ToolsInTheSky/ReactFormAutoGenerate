@@ -245,7 +245,18 @@ const RjsfAutoForm = ({
 			setSchemaHeaders(schema, record);
 			deleteMutate(
 				{ resource: actualResource, id: id, dataProviderName },
-				{ onSuccess: () => onCancel() },
+				{
+					onSuccess: () => {
+						if (isRest) {
+							queryClient.invalidateQueries({ queryKey: [resource] });
+						} else {
+							queryClient.invalidateQueries({
+								queryKey: ["gql-data", entityName],
+							});
+						}
+						onCancel();
+					},
+				},
 			);
 		}
 	};

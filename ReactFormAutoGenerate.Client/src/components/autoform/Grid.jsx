@@ -85,12 +85,14 @@ const AutoGrid = ({
    */
   const columns = useMemo(() => {
     if (!schema?.properties) return [];
+    const isKeyless = schema["x-keyless"] === true || schema["xKeyless"] === true;
+    
     return Object.keys(schema.properties).filter(key => {
       const prop = schema.properties[key];
       const lowerKey = key.toLowerCase();
       
-      // Filter 1: Skip primary ID fields (unless keyless)
-      if (!schema["x-keyless"] && (lowerKey === "id" || prop["x-identity"])) return false;
+      // Filter 1: Always skip ID fields from dynamic columns (they are either fixed or technical)
+      if (lowerKey === "id" || prop["x-identity"]) return false;
       
       // Filter 2: Detect complex nested types (objects/arrays)
       const isComplex = prop.type === "object" || 
@@ -111,9 +113,11 @@ const AutoGrid = ({
     return <div style={{ display: 'flex', justifyContent: 'center', padding: '50px' }}><Loader size="large" type="pulsing" /></div>;
   }
 
+  const isKeyless = schema["x-keyless"] === true || schema["xKeyless"] === true;
+
   const handleRowClick = (e) => {
     let idValue = null;
-    if (schema["x-keyless"]) {
+    if (isKeyless) {
         const identityFields = schema["x-identity-fields"] || [];
         idValue = identityFields.map(f => getVal(e.dataItem, f)).join('|');
     } else {
@@ -142,19 +146,18 @@ const AutoGrid = ({
         sort={sort}
         onSortChange={(e) => setSort(e.sort)}
         onRowClick={handleRowClick}>
-        {/* Fixed ID Column */}
-        <GridColumn 
-            field="id" 
-            title="ID" 
-            width="120px" 
-            cell={(props) => {
-                const item = props.dataItem;
-                const isKeyless = schema["x-keyless"];
-                const displayId = isKeyless ? `IDX:${data.indexOf(item) + 1}` : `#${getVal(item, "id")}`;
-                const titleId = isKeyless ? (schema["x-identity-fields"] || []).map(f => getVal(item, f)).join('|') : getVal(item, "id");
-                return <td {...props.tdProps} title={titleId}>{displayId}</td>;
-            }} 
-        />
+        {/* Fixed ID Column - Hidden for keyless entities */}
+        {!isKeyless && (
+          <GridColumn 
+              field="id" 
+              title="ID" 
+              width="120px" 
+              cell={(props) => {
+                  const item = props.dataItem;
+                  return <td {...props.tdProps}>#{getVal(item, "id")}</td>;
+              }} 
+          />
+        )}
         
         {/* Dynamically Generated Columns */}
         {columns.map(col => {

@@ -22,6 +22,19 @@ public class InventoryItemsController : ControllerBase
         return await _context.InventoryItems.ToListAsync();
     }
 
+    [HttpGet("page")]
+    public async Task<ActionResult<object>> GetPagedInventoryItems([FromQuery] int skip = 0, [FromQuery] int take = 10)
+    {
+        var totalCount = await _context.InventoryItems.CountAsync();
+        var items = await _context.InventoryItems
+            .OrderBy(i => i.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return new { items, totalCount };
+    }
+
     [HttpGet]
     public async Task<ActionResult<InventoryItem>> GetInventoryItem([FromHeader(Name = "x-id")] int id)
     {

@@ -139,9 +139,9 @@ const RjsfEntityManager = ({
 			schema["x-keyless"] === true || schema["xKeyless"] === true;
 
 		if (isKeyless) {
-			return `query { ${queryName} { items { ${fields} } } }`;
+			return `query GetData($skip: Int, $take: Int) { ${queryName}(skip: $skip, take: $take) { items { ${fields} } } }`;
 		}
-		return `query { ${queryName} { items { id ${fields} } totalCount } }`;
+		return `query GetData($skip: Int, $take: Int) { ${queryName}(skip: $skip, take: $take) { items { id ${fields} } } }`;
 	}, [schema, entityName, isRest]);
 
 	// Section 3: Fetch List Data
@@ -156,7 +156,11 @@ const RjsfEntityManager = ({
 				const res = await api.get(`/${resource}/all`);
 				return res.data;
 			} else {
-				const res = await axios.post("/graphql", { query: dynamicQuery });
+				// For the Grid, we want "all" rows, so we ask for a large page size (e.g., 1000)
+				const res = await axios.post("/graphql", { 
+                    query: dynamicQuery,
+                    variables: { skip: 0, take: 1000 }
+                });
 				if (res.data.errors) throw new Error(res.data.errors[0].message);
 				return res.data;
 			}

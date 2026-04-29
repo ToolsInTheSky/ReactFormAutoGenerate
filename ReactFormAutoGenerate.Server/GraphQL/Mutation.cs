@@ -154,7 +154,7 @@ public class Mutation
 
     // --- ProductLog Mutations (Keyless) ---
 
-    public record CreateProductLogInput(int ProductId, string Activity, string? PerformedBy, DateTime? LogDate);
+    public record CreateProductLogInput(int ProductId, string Activity, string PerformedBy, DateTime? LogDate);
     public record CreateOneProductLogInput(CreateProductLogInput ProductLog);
 
     public async Task<ProductLog> CreateOneProductLogAsync(
@@ -166,10 +166,83 @@ public class Mutation
             ProductId = input.ProductLog.ProductId, 
             Activity = input.ProductLog.Activity, 
             PerformedBy = input.ProductLog.PerformedBy,
-            LogDate = input.ProductLog.LogDate ?? DateTime.UtcNow
+            LogDate = DateTime.SpecifyKind(input.ProductLog.LogDate ?? DateTime.UtcNow, DateTimeKind.Utc)
         };
         context.ProductLogs.Add(log);
         await context.SaveChangesAsync();
         return log;
+    }
+
+    public record UpdateOneProductLogInput(string Id, CreateProductLogInput Update);
+
+    public async Task<ProductLog> UpdateOneProductLogAsync(
+        UpdateOneProductLogInput input, [Service] IDbContextFactory<AppDbContext> contextFactory)
+    {
+        var (productId, activity, logDate, performedBy) = ParseProductLogId(input.Id);
+        using var context = contextFactory.CreateDbContext();
+
+        var minDate = logDate.AddMilliseconds(-1);
+        var maxDate = logDate.AddMilliseconds(1);
+
+        var existing = await context.ProductLogs.FirstOrDefaultAsync(p =>
+            p.ProductId == productId &&
+            p.Activity == activity &&
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
+            p.PerformedBy == performedBy);
+
+        if (existing == null) throw new Exception("ProductLog not found");
+
+        // Remove and re-add because it's all key fields
+        context.ProductLogs.Remove(existing);
+        var updated = new ProductLog
+        {
+            ProductId = input.Update.ProductId,
+            Activity = input.Update.Activity,
+            PerformedBy = input.Update.PerformedBy,
+            LogDate = DateTime.SpecifyKind(input.Update.LogDate ?? DateTime.UtcNow, DateTimeKind.Utc)
+        };
+        context.ProductLogs.Add(updated);
+        await context.SaveChangesAsync();
+        return updated;
+    }
+
+    public record DeleteOneProductLogInput(string Id);
+
+    public async Task<ProductLog> DeleteOneProductLogAsync(
+        DeleteOneProductLogInput input, [Service] IDbContextFactory<AppDbContext> contextFactory)
+    {
+        var (productId, activity, logDate, performedBy) = ParseProductLogId(input.Id);
+        using var context = contextFactory.CreateDbContext();
+
+        var minDate = logDate.AddMilliseconds(-1);
+        var maxDate = logDate.AddMilliseconds(1);
+
+        var log = await context.ProductLogs.FirstOrDefaultAsync(p =>
+            p.ProductId == productId &&
+            p.Activity == activity &&
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
+            p.PerformedBy == performedBy);
+
+        if (log == null) throw new Exception("ProductLog not found");
+
+        context.ProductLogs.Remove(log);
+        await context.SaveChangesAsync();
+        return log;
+    }
+
+    private static (int productId, string activity, DateTime logDate, string performedBy) ParseProductLogId(string id)
+    {
+        var tokens = id.Split('|').Select(t => t.Trim('\"', ' ')).ToList();
+        if (tokens.Count < 3) throw new Exception("Invalid ProductLog ID format");
+
+        int productId = int.Parse(tokens[0]);
+        string activity = tokens[1];
+        DateTime logDate = DateTime.Parse(tokens[2], null, System.Globalization.DateTimeStyles.RoundtripKind);
+        logDate = DateTime.SpecifyKind(logDate, DateTimeKind.Utc);
+        string performedBy = tokens.Count > 3 ? tokens[3] : "";
+
+        return (productId, activity, logDate, performedBy);
     }
 }

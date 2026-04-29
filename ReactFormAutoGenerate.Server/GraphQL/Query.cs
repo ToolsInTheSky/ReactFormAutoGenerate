@@ -47,24 +47,18 @@ public class Query
     [UseProjection]
     public async Task<ProductLog?> GetProductLogAsync([GraphQLType(typeof(IdType))] string id, AppDbContext context)
     {
-        var parts = id.Split('|');
-        if (parts.Length < 3) return null;
+        var (productId, activity, logDate, performedBy) = ParseProductLogId(id);
 
-        if (!int.TryParse(parts[0], out int productId)) return null;
-        string activity = parts[1];
-        if (!DateTime.TryParse(parts[2], out DateTime logDate)) return null;
-        
-        // Ensure UTC kind for PostgreSQL
-        logDate = DateTime.SpecifyKind(logDate, DateTimeKind.Utc);
-        
-        string performedBy = parts.Length > 3 ? parts[3] : string.Empty;
+        var minDate = logDate.AddMilliseconds(-1);
+        var maxDate = logDate.AddMilliseconds(1);
 
         // Find by composite key components
         return await context.ProductLogs.FirstOrDefaultAsync(p =>
             p.ProductId == productId &&
             p.Activity == activity &&
-            p.LogDate == logDate &&
-            (p.PerformedBy ?? string.Empty) == (performedBy ?? string.Empty));
+            p.LogDate >= minDate &&
+            p.LogDate <= maxDate &&
+            p.PerformedBy == performedBy);
     }
 
     [UseOffsetPaging(IncludeTotalCount = true)]
@@ -73,6 +67,20 @@ public class Query
     [UseSorting]
     public IQueryable<ProductLog> GetProductLogs(AppDbContext context) =>
         context.ProductLogs;
+
+    private static (int productId, string activity, DateTime logDate, string performedBy) ParseProductLogId(string id)
+    {
+        var tokens = id.Split('|').Select(t => t.Trim('\"', ' ')).ToList();
+        if (tokens.Count < 3) throw new Exception("Invalid ProductLog ID format");
+
+        int productId = int.Parse(tokens[0]);
+        string activity = tokens[1];
+        DateTime logDate = DateTime.Parse(tokens[2], null, System.Globalization.DateTimeStyles.RoundtripKind);
+        logDate = DateTime.SpecifyKind(logDate, DateTimeKind.Utc);
+        string performedBy = tokens.Count > 3 ? tokens[3] : "";
+
+        return (productId, activity, logDate, performedBy);
+    }
 
     /// <summary>
     /// Returns the JSON Schema for a given entity type using NJsonSchema.

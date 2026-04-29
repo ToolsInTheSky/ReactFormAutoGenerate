@@ -22,6 +22,20 @@ public class ProductsController : ControllerBase
         return await _context.Products.Include(p => p.Category).ToListAsync();
     }
 
+    [HttpGet("page")]
+    public async Task<ActionResult<object>> GetPagedProducts([FromQuery] int skip = 0, [FromQuery] int take = 10)
+    {
+        var totalCount = await _context.Products.CountAsync();
+        var items = await _context.Products
+            .Include(p => p.Category)
+            .OrderBy(p => p.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return new { items, totalCount };
+    }
+
     [HttpGet]
     public async Task<ActionResult<Product>> GetProduct([FromHeader(Name = "x-id")] int id)
     {

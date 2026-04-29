@@ -9,6 +9,7 @@
 import { Loader } from "@progress/kendo-react-indicators";
 import { Card, CardBody } from "@progress/kendo-react-layout";
 import { useList } from "@refinedev/core";
+import { useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { GraphQLClient } from "graphql-request";
 import pluralize from "pluralize";
@@ -52,6 +53,8 @@ export const UniformEntityManager = ({
 }) => {
 	const isRest = protocol === "rest";
 	const actualResource = isRest ? resource : toPluralCamelCase(entityName);
+	const queryClient = useQueryClient();
+
 	const client = useMemo(
 		() =>
 			isRest ? null : new GraphQLClient(window.location.origin + "/graphql"),
@@ -59,7 +62,11 @@ export const UniformEntityManager = ({
 	);
 
 	// Section 1: Refine List Hook (REST only)
-	const { data: listData, isLoading: isListLoadingRest } = useList({
+	const {
+		data: listData,
+		isLoading: isListLoadingRest,
+		refetch: refetchRest,
+	} = useList({
 		resource: `${actualResource}/all`,
 		queryOptions: { enabled: isRest },
 	});
@@ -119,8 +126,11 @@ export const UniformEntityManager = ({
 				const isKeyless =
 					schema["x-keyless"] === true || schema["xKeyless"] === true;
 				const idField = isKeyless ? "" : "id";
-				const query = `query { ${qName} { items { ${idField} ${fields} } } }`;
-				const res = await axios.post("/graphql", { query });
+				const query = `query GetData($skip: Int, $take: Int) { ${qName}(skip: $skip, take: $take) { items { ${idField} ${fields} } } }`;
+				const res = await axios.post("/graphql", { 
+                    query,
+                    variables: { skip: 0, take: 1000 }
+                });
 				setRecords(res.data?.data?.[qName]?.items || []);
 			} catch (err) {
 				console.error(err);
@@ -128,12 +138,21 @@ export const UniformEntityManager = ({
 				setIsListLoadingGql(false);
 			}
 		} else if (isRest) {
-			fetch(`/api/${resource}/all`)
-				.then((res) => res.json())
-				.then((data) => setRecords(Array.isArray(data) ? data : []))
-				.catch((err) => console.error(err));
+			// Invalidate Refine's list query to trigger a refresh
+			queryClient.invalidateQueries({
+				queryKey: ["default", `${actualResource}/all`, "list"],
+			});
+			// Also fallback manual refetch if invalidate doesn't trigger immediately
+			refetchRest();
 		}
-	}, [isRest, schema, entityName, resource]);
+	}, [
+		isRest,
+		schema,
+		entityName,
+		actualResource,
+		queryClient,
+		refetchRest,
+	]);
 
 	/**
 	 * Section 3: !!! IMPORTANT: Schema and Lookup Loading !!!

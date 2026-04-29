@@ -22,6 +22,19 @@ public class CategoriesController : ControllerBase
         return await _context.Categories.ToListAsync();
     }
 
+    [HttpGet("page")]
+    public async Task<ActionResult<object>> GetPagedCategories([FromQuery] int skip = 0, [FromQuery] int take = 10)
+    {
+        var totalCount = await _context.Categories.CountAsync();
+        var items = await _context.Categories
+            .OrderBy(c => c.Id)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync();
+
+        return new { items, totalCount };
+    }
+
     [HttpGet]
     public async Task<ActionResult<Category>> GetCategory([FromHeader(Name = "x-id")] int id)
     {
