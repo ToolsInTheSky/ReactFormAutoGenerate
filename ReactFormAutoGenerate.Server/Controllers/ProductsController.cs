@@ -16,14 +16,14 @@ public class ProductsController : ControllerBase
         _context = context;
     }
 
-    [HttpGet]
+    [HttpGet("all")]
     public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
     {
         return await _context.Products.Include(p => p.Category).ToListAsync();
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Product>> GetProduct(int id)
+    [HttpGet]
+    public async Task<ActionResult<Product>> GetProduct([FromHeader(Name = "x-id")] int id)
     {
         var product = await _context.Products.Include(p => p.Category).FirstOrDefaultAsync(p => p.Id == id);
 
@@ -44,9 +44,9 @@ public class ProductsController : ControllerBase
         return CreatedAtAction(nameof(GetProduct), new { id = product.Id }, product);
     }
 
-    [HttpPut("{id}")]
-    [HttpPatch("{id}")]
-    public async Task<IActionResult> PutProduct(int id, Product product)
+    [HttpPut]
+    [HttpPatch]
+    public async Task<IActionResult> PutProduct([FromHeader(Name = "x-id")] int id, Product product)
     {
         if (id != product.Id)
         {
@@ -74,8 +74,8 @@ public class ProductsController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteProduct(int id)
+    [HttpDelete]
+    public async Task<IActionResult> DeleteProduct([FromHeader(Name = "x-id")] int id)
     {
         var product = await _context.Products.FindAsync(id);
         if (product == null)

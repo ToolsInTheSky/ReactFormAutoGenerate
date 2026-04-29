@@ -16,14 +16,14 @@ public class InventoryItemsController : ControllerBase
         _context = context;
     }
 
-    [HttpGet]
+    [HttpGet("all")]
     public async Task<ActionResult<IEnumerable<InventoryItem>>> GetInventoryItems()
     {
         return await _context.InventoryItems.ToListAsync();
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<InventoryItem>> GetInventoryItem(int id)
+    [HttpGet]
+    public async Task<ActionResult<InventoryItem>> GetInventoryItem([FromHeader(Name = "x-id")] int id)
     {
         var item = await _context.InventoryItems.FindAsync(id);
         if (item == null) return NotFound();
@@ -39,9 +39,9 @@ public class InventoryItemsController : ControllerBase
         return CreatedAtAction(nameof(GetInventoryItem), new { id = item.Id }, item);
     }
 
-    [HttpPut("{id}")]
-    [HttpPatch("{id}")]
-    public async Task<IActionResult> PutInventoryItem(int id, InventoryItem item)
+    [HttpPut]
+    [HttpPatch]
+    public async Task<IActionResult> PutInventoryItem([FromHeader(Name = "x-id")] int id, InventoryItem item)
     {
         if (id != item.Id) return BadRequest();
         item.UpdateDate = DateTime.UtcNow;
@@ -50,8 +50,8 @@ public class InventoryItemsController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteInventoryItem(int id)
+    [HttpDelete]
+    public async Task<IActionResult> DeleteInventoryItem([FromHeader(Name = "x-id")] int id)
     {
         var item = await _context.InventoryItems.FindAsync(id);
         if (item == null) return NotFound();

@@ -18,9 +18,7 @@ public class ProductLog
 
     public DateTime LogDate { get; set; } = DateTime.UtcNow;
 
+    [Required]
     [MaxLength(100)]
-    public string? PerformedBy { get; set; }
-
-    [NotMapped]
-    public string Id => $"{ProductId}|{Activity}|{LogDate:O}|{PerformedBy}";
+    public string PerformedBy { get; set; } = string.Empty;
 }

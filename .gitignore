@@ -1,3 +1,6 @@
+ReactFormAutoGenerate.Client/offline_packages/
+ReactFormAutoGenerate.Client/offline/
+
 ## [Visual Studio]
 .vs/
 [Bb]in/

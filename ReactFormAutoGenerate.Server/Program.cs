@@ -49,7 +49,7 @@ await DatabaseInitializer.InitializeAsync(app.Services);
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    
+
     if (!context.Categories.Any())
     {
         var electronics = new Category { Name = "Electronics" };
@@ -59,23 +59,23 @@ using (var scope = app.Services.CreateScope())
 
         if (!context.Products.Any())
         {
-            context.Products.Add(new Product 
-            { 
-                Name = "Smartphone", 
-                Price = 699.99m, 
-                CategoryId = electronics.Id 
+            context.Products.Add(new Product
+            {
+                Name = "Smartphone",
+                Price = 699.99m,
+                CategoryId = electronics.Id
             });
-            context.Products.Add(new Product 
-            { 
-                Name = "Laptop", 
-                Price = 1299.99m, 
-                CategoryId = electronics.Id 
+            context.Products.Add(new Product
+            {
+                Name = "Laptop",
+                Price = 1299.99m,
+                CategoryId = electronics.Id
             });
-            context.Products.Add(new Product 
-            { 
-                Name = "C# in Depth", 
-                Price = 45.00m, 
-                CategoryId = books.Id 
+            context.Products.Add(new Product
+            {
+                Name = "C# in Depth",
+                Price = 45.00m,
+                CategoryId = books.Id
             });
             context.SaveChanges();
         }

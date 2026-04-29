@@ -16,14 +16,14 @@ public class CategoriesController : ControllerBase
         _context = context;
     }
 
-    [HttpGet]
+    [HttpGet("all")]
     public async Task<ActionResult<IEnumerable<Category>>> GetCategories()
     {
         return await _context.Categories.ToListAsync();
     }
 
-    [HttpGet("{id}")]
-    public async Task<ActionResult<Category>> GetCategory(int id)
+    [HttpGet]
+    public async Task<ActionResult<Category>> GetCategory([FromHeader(Name = "x-id")] int id)
     {
         var category = await _context.Categories.FindAsync(id);
 
@@ -44,9 +44,9 @@ public class CategoriesController : ControllerBase
         return CreatedAtAction(nameof(GetCategory), new { id = category.Id }, category);
     }
 
-    [HttpPut("{id}")]
-    [HttpPatch("{id}")]
-    public async Task<IActionResult> PutCategory(int id, Category category)
+    [HttpPut]
+    [HttpPatch]
+    public async Task<IActionResult> PutCategory([FromHeader(Name = "x-id")] int id, Category category)
     {
         if (id != category.Id)
         {
@@ -74,8 +74,8 @@ public class CategoriesController : ControllerBase
         return NoContent();
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteCategory(int id)
+    [HttpDelete]
+    public async Task<IActionResult> DeleteCategory([FromHeader(Name = "x-id")] int id)
     {
         var category = await _context.Categories.FindAsync(id);
         if (category == null)

@@ -27,23 +27,34 @@ public class SchemaController : ControllerBase
     {
         public void Process(SchemaProcessorContext context)
         {
+            var type = context.ContextualType.Type;
+
+            // Guard: only process entity types, skip primitives and system types
+            if (type.Namespace == null || !type.Namespace.StartsWith("ReactFormAutoGenerate.Server.Entities")) return;
+
             if (context.Schema.Properties == null) return;
 
             var allProps = context.ContextualType.Type.GetProperties();
             bool hasIdentity = false;
+            var keyFieldNames = new List<string>();
 
             foreach (var prop in allProps)
             {
+                // Skip [NotMapped] properties — they are not real columns
+                if (prop.GetCustomAttribute<NotMappedAttribute>() != null) continue;
+
                 if (context.Schema.Properties.TryGetValue(prop.Name, out var jsonProp))
                 {
                     if (jsonProp.ExtensionData == null) jsonProp.ExtensionData = new Dictionary<string, object?>();
-                    
+
                     // Add x-identity for properties with [Key] attribute or named "Id"
-                    if (prop.GetCustomAttribute<KeyAttribute>() != null || 
+                    // but only if NOT [NotMapped]
+                    if (prop.GetCustomAttribute<KeyAttribute>() != null ||
                         string.Equals(prop.Name, "Id", StringComparison.OrdinalIgnoreCase))
                     {
                         jsonProp.ExtensionData["x-identity"] = true;
                         hasIdentity = true;
+                        keyFieldNames.Add(prop.Name);
                     }
 
                     // Add x-relation for foreign key fields
@@ -51,10 +62,10 @@ public class SchemaController : ControllerBase
                     string? entityBaseName = null;
 
                     // Ensure we only apply x-relation to simple ID properties, not navigation objects
-                    bool isSimpleType = prop.PropertyType.IsPrimitive || 
-                                       prop.PropertyType == typeof(int) || 
-                                       prop.PropertyType == typeof(long) || 
-                                       prop.PropertyType == typeof(string) || 
+                    bool isSimpleType = prop.PropertyType.IsPrimitive ||
+                                       prop.PropertyType == typeof(int) ||
+                                       prop.PropertyType == typeof(long) ||
+                                       prop.PropertyType == typeof(string) ||
                                        prop.PropertyType == typeof(decimal) ||
                                        Nullable.GetUnderlyingType(prop.PropertyType) != null;
 
@@ -81,13 +92,16 @@ public class SchemaController : ControllerBase
                 }
             }
 
-            // If no single identity property was found, mark as keyless and provide all fields as composite identity
-            if (!hasIdentity)
-            {
-                if (context.Schema.ExtensionData == null) context.Schema.ExtensionData = new Dictionary<string, object?>();
-                context.Schema.ExtensionData["x-keyless"] = true;
-                context.Schema.ExtensionData["x-identity-fields"] = allProps.Select(p => p.Name).ToList();
-            }
+            // Always emit x-keyless and x-identity-fields on the root schema.
+            // For entities with a key: x-keyless=false, x-identity-fields = key column names.
+            // For keyless entities:    x-keyless=true,  x-identity-fields = all mapped column names.
+            if (context.Schema.ExtensionData == null) context.Schema.ExtensionData = new Dictionary<string, object?>();
+            context.Schema.ExtensionData["x-keyless"] = !hasIdentity;
+            context.Schema.ExtensionData["x-identity-fields"] = hasIdentity
+                ? keyFieldNames
+                : allProps
+                    .Where(p => p.GetCustomAttribute<NotMappedAttribute>() == null)
+                    .Select(p => p.Name).ToList();
         }
     }
 
@@ -101,7 +115,7 @@ public class SchemaController : ControllerBase
         {
             var schema = JsonSchema.FromType(type, Settings);
             schema.Id = null; // Fix: Remove root 'id' to avoid AJV 8+ errors
-            
+
             // Serialize to string and back to object to avoid JObject/System.Text.Json conflict
             var schemaJson = schema.ToJson();
             schemas[type.Name] = System.Text.Json.JsonSerializer.Deserialize<object>(schemaJson)!;
@@ -119,14 +133,14 @@ public class SchemaController : ControllerBase
 
         var schema = JsonSchema.FromType(type, Settings);
         schema.Id = null; // Fix: Remove root 'id'
-        
+
         return Content(schema.ToJson(), "application/json");
     }
 
     private Type? GetEntityType(string name)
     {
-        return typeof(Category).Assembly.GetTypes().FirstOrDefault(t => 
-            t.Namespace == "ReactFormAutoGenerate.Server.Entities" && 
+        return typeof(Category).Assembly.GetTypes().FirstOrDefault(t =>
+            t.Namespace == "ReactFormAutoGenerate.Server.Entities" &&
             string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
     }
 }
