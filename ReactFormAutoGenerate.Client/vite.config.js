@@ -61,7 +61,7 @@ export default defineConfig({
 				target,
 				secure: false,
 			},
-			"/graphql": {
+			"^/graphql$": {
 				target,
 				secure: false,
 				changeOrigin: true,

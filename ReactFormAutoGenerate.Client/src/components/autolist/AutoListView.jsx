@@ -13,7 +13,7 @@ import { Loader } from "@progress/kendo-react-indicators";
 import { ListView, ListViewHeader } from "@progress/kendo-react-listview";
 import { arrowRotateCwIcon, plusIcon } from "@progress/kendo-svg-icons";
 import axios from "axios";
-import { GraphQLClient, gql } from "graphql-request";
+import { gql } from "graphql-request";
 import pluralize from "pluralize";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -49,24 +49,21 @@ const AutoListView = ({
 	const [lookups, setLookups] = useState({});
 
 	const isRest = protocol === "rest";
-	const client = useMemo(
-		() =>
-			isRest ? null : new GraphQLClient(window.location.origin + "/graphql"),
-		[isRest],
-	);
-
+	
 	const toPluralCamelCase = useCallback(
-		(name) => toCamelCase(pluralize(name)),
+		(name) => toCamelCase(pluralize(name || "")),
 		[],
 	);
 
 	/**
 	 * Phase 1: Fetch Schema and Lookup Options
-	 * This runs only when the resource/protocol changes.
 	 */
 	useEffect(() => {
+		let isMounted = true;
 		const loadMeta = async () => {
+			if (!entityName && !resource) return;
 			setLoading(true);
+			console.log(`AutoListView [${protocol}] Phase 1: Loading metadata for ${entityName || resource}`);
 			try {
 				let parsedSchema = null;
 				if (isRest) {
@@ -76,14 +73,15 @@ const AutoListView = ({
 					const sRes = await axios.get(`/api/schema/${schemaKey}`);
 					parsedSchema = sRes.data;
 				} else {
-					const schemaQuery = gql`query GetSchema($name: String!, $proto: String!) { jsonSchema(entityName: $name, protocol: $proto) }`;
-					const sRes = await client.request(schemaQuery, {
-						name: entityName,
-						proto: "rjsf",
+					const schemaQuery = `query GetSchema($name: String!, $proto: String!) { jsonSchema(entityName: $name, protocol: $proto) }`;
+					const sRes = await axios.post("/graphql", {
+						query: schemaQuery,
+						variables: { name: entityName, proto: "rjsf" }
 					});
-					parsedSchema = JSON.parse(sRes.jsonSchema);
+                    if (sRes.data.errors) throw new Error(sRes.data.errors[0].message);
+					parsedSchema = JSON.parse(sRes.data.data.jsonSchema);
 				}
-				setSchema(parsedSchema);
+				if (isMounted) setSchema(parsedSchema);
 
 				// Resolve Relationships
 				if (parsedSchema?.properties) {
@@ -120,75 +118,88 @@ const AutoListView = ({
 							lookupResults[key.toLowerCase()] = map;
 						}),
 					);
-					setLookups(lookupResults);
+					if (isMounted) setLookups(lookupResults);
 				}
 			} catch (err) {
-				console.error("Error loading AutoListView metadata:", err);
+				console.error(`AutoListView [${protocol}] Error loading metadata:`, err.message);
 			} finally {
-				setLoading(false);
+				if (isMounted) setLoading(false);
 			}
 		};
 
 		loadMeta();
-	}, [isRest, resource, entityName, client, toPluralCamelCase]);
+		return () => { isMounted = false; };
+	}, [isRest, resource, entityName, toPluralCamelCase, protocol]);
 
 	/**
 	 * Phase 2: Fetch Paged Data
-	 * This runs when the page state changes or schema is ready.
 	 */
-	const fetchPagedData = useCallback(async () => {
-		if (!schema) return;
-		setLoading(true);
-		try {
-			if (isRest) {
-				const res = await axios.get(`/api/${resource}/page`, {
-					params: { skip: page.skip, take: page.take },
-				});
-				setData(res.data?.items || []);
-				setTotal(res.data?.totalCount || 0);
-			} else {
-				const queryFields = Object.keys(schema.properties)
-					.filter((key) => {
-						const prop = schema.properties[key];
-						const isComplex =
-							prop.type === "object" ||
-							prop.type === "array" ||
-							prop.$ref ||
-							prop.oneOf ||
-							prop.anyOf;
-						return !isComplex || !!prop["x-relation"];
-					})
-					.map(toCamelCase)
-					.join("\n");
-
-				const qName = toPluralCamelCase(entityName);
-				const isKeyless =
-					schema["x-keyless"] === true || schema["xKeyless"] === true;
-				const idField = isKeyless ? "" : "id";
-
-				const dataQuery = gql`query GetData($skip: Int!, $take: Int!) { 
-                    ${qName}(skip: $skip, take: $take) { 
-                        items { ${idField} ${queryFields} } 
-                        totalCount 
-                    } 
-                }`;
-				const res = await client.request(dataQuery, {
-					skip: page.skip,
-					take: page.take,
-				});
-				setData(res?.[qName]?.items || []);
-				setTotal(res?.[qName]?.totalCount || 0);
-			}
-		} catch (err) {
-			console.error("Error in AutoListView fetchPagedData:", err);
-		} finally {
-			setLoading(false);
-		}
-	}, [isRest, resource, entityName, client, toPluralCamelCase, page.skip, page.take, schema]);
-
 	useEffect(() => {
-		fetchPagedData();
-	}, [fetchPagedData]);
+		if (!schema) return;
+		let isMounted = true;
+		
+		const fetchData = async () => {
+			setLoading(true);
+			console.log(`AutoListView [${protocol}] Phase 2: Fetching ${entityName || resource} skip:${page.skip} take:${page.take}`);
+			try {
+				if (isRest) {
+					const res = await axios.get(`/api/${resource}/page`, {
+						params: { skip: page.skip, take: page.take },
+					});
+					if (isMounted) {
+						console.log(`AutoListView [REST] received ${res.data?.items?.length} items, total: ${res.data?.totalCount}`);
+						setData(res.data?.items || []);
+						setTotal(res.data?.totalCount || 0);
+					}
+				} else {
+					const queryFields = Object.keys(schema.properties)
+						.filter((key) => {
+							const prop = schema.properties[key];
+							const isComplex =
+								prop.type === "object" ||
+								prop.type === "array" ||
+								prop.$ref ||
+								prop.oneOf ||
+								prop.anyOf;
+							return !isComplex || !!prop["x-relation"];
+						})
+						.map(toCamelCase)
+						.join("\n");
+
+					const qName = toPluralCamelCase(entityName);
+					const isKeyless =
+						schema["x-keyless"] === true || schema["xKeyless"] === true;
+					const idField = isKeyless ? "" : "id";
+
+					const dataQuery = `query GetData($skip: Int!, $take: Int!) { 
+						${qName}(skip: $skip, take: $take) { 
+							items { ${idField} ${queryFields} } 
+							totalCount 
+						} 
+					}`;
+					const res = await axios.post("/graphql", { 
+                        query: dataQuery,
+                        variables: { skip: page.skip, take: page.take }
+                    });
+                    if (res.data.errors) throw new Error(res.data.errors[0].message);
+
+					if (isMounted) {
+                        const gqlData = res.data.data[qName];
+						console.log(`AutoListView [GQL] received ${gqlData?.items?.length} items, total: ${gqlData?.totalCount}`);
+						setData(gqlData?.items || []);
+						setTotal(gqlData?.totalCount || 0);
+					}
+				}
+			} catch (err) {
+				console.error(`AutoListView [${protocol}] Error fetching data:`, err.message);
+			} finally {
+				if (isMounted) setLoading(false);
+			}
+		};
+
+		fetchData();
+		return () => { isMounted = false; };
+	}, [schema, page.skip, page.take, protocol, resource, entityName, isRest, toPluralCamelCase]);
 
 	const columns = useMemo(() => {
 		if (!schema?.properties) return [];
@@ -208,86 +219,14 @@ const AutoListView = ({
 		});
 	}, [schema]);
 
-	const gridStyle = {
+	const gridStyle = useMemo(() => ({
 		display: "grid",
-		gridTemplateColumns: `120px repeat(${columns.length}, 1fr)`,
+		gridTemplateColumns: (schema?.["x-keyless"] || schema?.["xKeyless"])
+            ? `repeat(${columns.length}, 1fr)`
+            : `120px repeat(${columns.length}, 1fr)`,
 		gap: "10px",
 		alignItems: "center",
-	};
-
-	/**
-	 * Custom Item Renderer (Grid Row)
-	 */
-	const GridRowRender = (props) => {
-		const item = props.dataItem;
-		if (!schema) return null;
-
-		let displayId = "";
-		let idValue = null;
-
-		if (schema["x-keyless"]) {
-			const identityFields = schema["x-identity-fields"] || [];
-			idValue = identityFields.map((f) => getVal(item, f)).join("|");
-			displayId = `IDX:${page.skip + props.itemIndex + 1}`;
-		} else {
-			idValue = getVal(item, "id");
-			displayId = `#${idValue}`;
-		}
-
-		return (
-			<div
-				className="autolist-row"
-				style={{
-					...gridStyle,
-					padding: "12px 15px",
-					borderBottom: "1px solid #eee",
-					cursor: onRowClick ? "pointer" : "default",
-					transition: "background-color 0.2s",
-				}}
-				onClick={() => onRowClick?.(idValue, item)}
-			>
-				<div
-					style={{ fontWeight: "bold", color: "#666", fontSize: "0.85rem" }}
-					title={idValue}
-				>
-					{displayId}
-				</div>
-				{columns.map((col) => {
-					const prop = schema.properties[col];
-					const val = getVal(item, col);
-					const isDate =
-						col.toLowerCase().includes("date") || prop.format === "date-time";
-					const lookupMap = lookups[col.toLowerCase()];
-
-					let displayVal = "";
-
-					if (lookupMap && val !== undefined) {
-						displayVal = lookupMap[String(val)] || String(val);
-					} else if (isDate && val) {
-						displayVal = new Date(val).toLocaleDateString();
-					} else if (typeof val === "boolean") {
-						displayVal = val ? "Yes" : "No";
-					} else {
-						displayVal = String(val ?? "");
-					}
-
-					return (
-						<div
-							key={col}
-							style={{
-								whiteSpace: "nowrap",
-								overflow: "hidden",
-								textOverflow: "ellipsis",
-							}}
-							title={displayVal}
-						>
-							{displayVal}
-						</div>
-					);
-				})}
-			</div>
-		);
-	};
+	}), [schema, columns.length]);
 
 	if (loading && !schema)
 		return (
@@ -342,12 +281,9 @@ const AutoListView = ({
 					textTransform: "uppercase",
 					fontSize: "0.8rem",
 					letterSpacing: "1px",
-					gridTemplateColumns: schema["x-keyless"] || schema["xKeyless"] 
-						? `repeat(${columns.length}, 1fr)` 
-						: `120px repeat(${columns.length}, 1fr)`
 				}}
 			>
-				{!(schema["x-keyless"] || schema["xKeyless"]) && <div>ID</div>}
+				{!(schema?.["x-keyless"] || schema?.["xKeyless"]) && <div>ID</div>}
 				{columns.map((col) => {
 					const prop = schema.properties[col];
 					const relRes = prop["x-relation"];
@@ -386,9 +322,6 @@ const AutoListView = ({
 								borderBottom: "1px solid #eee",
 								cursor: onRowClick ? "pointer" : "default",
 								transition: "background-color 0.2s",
-								gridTemplateColumns: isKeyless 
-									? `repeat(${columns.length}, 1fr)` 
-									: `120px repeat(${columns.length}, 1fr)`
 							}}
 							onClick={() => onRowClick?.(idValue, item)}
 						>
@@ -468,7 +401,10 @@ const AutoListView = ({
 				skip={page.skip}
 				take={page.take}
 				total={total}
-				onPageChange={(e) => setPage({ skip: e.skip, take: e.take })}
+				onPageChange={(e) => {
+                    console.log(`AutoListView Pager onPageChange: skip=${e.skip} take=${e.take}`);
+                    setPage({ skip: e.skip, take: e.take });
+                }}
 				pageSizeValues={[5, 10, 20, 50]}
 			/>
 		</div>

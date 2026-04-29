@@ -10,6 +10,13 @@ const listPages = [
 for (const listPage of listPages) {
   test.describe(`Pagination - ${listPage.name}`, () => {
     test.beforeEach(async ({ page }) => {
+      page.on('console', msg => console.log(`BROWSER [${listPage.name}]: ${msg.text()}`));
+      page.on('requestfailed', request => console.log(`REQUEST FAILED [${listPage.name}]: ${request.url()} - ${request.failure()?.errorText}`));
+      page.on('response', response => {
+          if (response.status() >= 400) {
+              console.log(`RESPONSE ERROR [${listPage.name}]: ${response.url()} - Status ${response.status()}`);
+          }
+      });
       test.setTimeout(90000);
       await page.goto(listPage.url);
       await page.waitForLoadState('networkidle');
@@ -44,7 +51,8 @@ for (const listPage of listPages) {
       if (await kendoDropdown.isVisible()) {
         await kendoDropdown.click();
         // Wait for the popup and select 20
-        const option = page.locator('.k-animation-container .k-list-item').filter({ hasText: /^20$/ });
+        // Use a more specific selector to avoid hitting other popups
+        const option = page.locator('.k-animation-container:visible .k-list-item').filter({ hasText: /^20$/ }).first();
         await option.click();
       } else {
         const select = page.locator('.k-pager-sizes select');
@@ -53,12 +61,9 @@ for (const listPage of listPages) {
         }
       }
       
-      // Wait for data to refresh
-      await page.waitForTimeout(2000);
-
-      // Verify more items are shown
+      // Wait for data to refresh - expect 20 rows
       const rows = page.locator('.autolist-row');
-      await expect(rows).toHaveCount(20, { timeout: 10000 });
+      await expect(rows).toHaveCount(20, { timeout: 15000 });
     });
   });
 }

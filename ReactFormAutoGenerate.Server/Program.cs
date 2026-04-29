@@ -51,42 +51,42 @@ using (var scope = app.Services.CreateScope())
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
     // Ensure Categories exist
-    if (!context.Categories.Any())
-    {
-        context.Categories.AddRange(
-            new Category { Name = "Electronics" },
-            new Category { Name = "Books" }
-        );
-        context.SaveChanges();
-    }
+    var electronics = context.Categories.AsEnumerable().FirstOrDefault(c => string.Equals(c.Name, "Electronics", StringComparison.OrdinalIgnoreCase));
+    var books = context.Categories.AsEnumerable().FirstOrDefault(c => string.Equals(c.Name, "Books", StringComparison.OrdinalIgnoreCase));
 
-    var electronics = context.Categories.FirstOrDefault(c => c.Name == "Electronics");
-    var books = context.Categories.FirstOrDefault(c => c.Name == "Books");
+    if (electronics == null)
+    {
+        electronics = new Category { Name = "Electronics" };
+        context.Categories.Add(electronics);
+    }
+    if (books == null)
+    {
+        books = new Category { Name = "Books" };
+        context.Categories.Add(books);
+    }
+    context.SaveChanges();
 
     // Ensure Products exist (at least 50 for paging tests)
-    if (electronics != null && books != null)
+    var productCount = context.Products.Count();
+    if (productCount < 50)
     {
-        var productCount = context.Products.Count();
-        if (productCount < 50)
+        for (int i = productCount + 1; i <= 50; i++)
         {
-            for (int i = productCount + 1; i <= 50; i++)
+            context.Products.Add(new Product
             {
-                context.Products.Add(new Product
-                {
-                    Name = $"Product {i}",
-                    Price = 10.00m + i,
-                    CategoryId = (i % 2 == 0) ? electronics.Id : books.Id
-                });
-            }
-            context.SaveChanges();
+                Name = $"Product {i}",
+                Price = 10.00m + i,
+                CategoryId = (i % 2 == 0) ? electronics.Id : books.Id
+            });
         }
+        context.SaveChanges();
     }
 
     // Ensure ProductLogs exist (at least 30)
     var logCount = context.ProductLogs.Count();
     if (logCount < 30)
     {
-        var firstProduct = context.Products.FirstOrDefault();
+        var firstProduct = context.Products.OrderBy(p => p.Id).FirstOrDefault();
         if (firstProduct != null)
         {
             for (int i = logCount + 1; i <= 30; i++)
@@ -102,6 +102,8 @@ using (var scope = app.Services.CreateScope())
             context.SaveChanges();
         }
     }
+
+    Console.WriteLine($"Seeding complete: {context.Categories.Count()} categories, {context.Products.Count()} products, {context.ProductLogs.Count()} logs.");
 }
 
 app.MapControllers();

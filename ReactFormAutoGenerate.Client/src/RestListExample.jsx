@@ -32,6 +32,7 @@ export const RestListExample = () => {
                 <AutoListView 
                     protocol="rest" 
                     resource="products" 
+                    entityName="Product"
                     title="Product Catalog (REST)" 
                     onRefresh={handleRefresh}
                     onCreate={handleCreate}
